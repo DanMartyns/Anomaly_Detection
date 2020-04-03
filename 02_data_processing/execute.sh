@@ -25,7 +25,7 @@ for f in $DIRECTORY; do
   # if not, the file is processed
   else
       echo "The directory $DIRECTORY_OUT not contain $filename$suffix"
-      python3 Processing.py -f "${f}"
+      python3 Processing.py -f "${f}" -ws 50 -wo 5
   fi
 
 done

@@ -5,6 +5,7 @@ import struct
 import subprocess
 import threading
 import time
+import argparse
 import numpy as np
 from sys import builtin_module_names
 import matplotlib.pyplot as plt
@@ -26,9 +27,9 @@ dt_string = now.strftime("%d-%m-%Y_%H_%M_%S")
 bfilename = label+"_"+dt_string+".bin"
 
 ON_POSIX = 'posix' in builtin_module_names
-# my_hackrf_sweep -f 2412:2484 -B -l 8 -g 0 -r power1.bin
+# my_hackrf_sweep -f 2412:2484 -B -l 8 -g 25 -r power1.bin
 cmdpipe = subprocess.Popen([
-    "./my_hackrf_sweep","-f {}".format(fstr),'-B',' -l 8 -g 0 ', "-r {}".format(bfilename)],
+    "./my_hackrf_sweep","-f {}".format(fstr),'-B',' -l 8 -g 25 ', "-r {}".format(bfilename)],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     close_fds=ON_POSIX)

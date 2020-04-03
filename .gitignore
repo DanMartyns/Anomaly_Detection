@@ -128,8 +128,11 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+.vscode/
+
 # Data
-00_data_extraction/data
-01_data_conversion/data
-02_data_processing/data
-03_data_classification/data
+*.dat
+*.bin
+
+#Images
+*.png
