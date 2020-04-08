@@ -83,25 +83,5 @@ class Metrics(object):
         # return the mean of the data
         return sum(wei_avg)/sum(weight)
 
-    '''
-        Input 
-            - channel : list of arrays with 10 elements
-        Return
-            - array with several timestamps that descrives the silences between times
-    '''
-    def silence(self,channel):
-        # initialize time array
-        times = []
-        
-        # if the channel was only one record, return empty array 
-        if len(channel) > 1 :
-
-            # for each record
-            for index, data in enumerate(channel[1:]):
-                times.append( (data[1]+data[2]/1e6) - (channel[index][1] + channel[index][2]/1e6) )
-
-        return times
-
-
 
 

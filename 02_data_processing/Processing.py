@@ -9,6 +9,13 @@ import numpy as np
 import dateutil.relativedelta
 from Metrics import Metrics
 from Plot import Plot
+import matplotlib.pyplot as plt
+
+def autolabel(rects, ax):
+    for rect in rects:
+        h = rect.get_height()
+        ax.text(rect.get_x()+rect.get_width()/2., 1.05*h, '%d'%int(h),
+                ha='center', va='bottom')
 
 epoch = datetime.datetime.utcfromtimestamp(0)
 
@@ -29,54 +36,51 @@ threshold = -65
 def window_analysis(observation_window):
     global window_size
 
-    #print("Observation Window: ", *observation_window, sep='\n')
-    #print('\n')
-
-    # Features to be written to the output file (14 channels, 3 metrics)
+    # Features to be written to the output file (window_size samples, 14 channels, 4 metrics)
+    # outMeasuresForEachSample = np.zeros( (sample, channel,metric) )
     # [0] - mean for each sample
     # [1] - variance for each sample
-    # [2] - standard deviation for each sample
-    # [3] - activity time
-    outMeasures = np.zeros( (14,4) )
-
-    silences = np.zeros( (14, window_size) )
-
-    # weight average for each channel
-    weight_average = np.zeros((14,window_size))
+    # [2] - silence times
+    outMeasuresForEachSample = np.zeros( (window_size,14,3) )
 
     for i, sample in enumerate(observation_window):
         # Split each instance in the 14 Wi-Fi channels
         channels = c.calculate("split_channels", sample[2:])
         
-        # Calculate the mean for each channel
+        # Calculate the metricss for each channel for each sample
         for index, channel in enumerate(channels):
-            # weighted average for each channel (each channel was 10 weighted_average)
-            # weighed_average[channel, sample] => result in 14 channels with 10 weighted_average
-            #print("Channel {}".format(index+1), channel, sep='\n') 
-            wa = c.calculate('weighted_average', channel)
-            weight_average[index, i] = wa
-            # Array of silence times for each channel
-            silences[index, i] = 1 if wa > threshold else 0
+            outMeasuresForEachSample[i, index, 0] = c.calculate('weighted_average', channel)
+            outMeasuresForEachSample[i, index, 1] = np.var(channel)
+            outMeasuresForEachSample[i, index, 2] = len(channel) - np.count_nonzero([int(x) for x in list(map(lambda x: x > threshold, channel))])
 
-    #print("Weight Average: ", weight_average)
+        # For each channel
+        #print("For each channel: ",outMeasuresForEachSample[i, :,:], sep='\n')
 
-    # mean for each sample using the weighted average of the channels
-    outMeasures[:, 0] = weight_average.mean(axis=1)
-    #print("Mean: ", outMeasures[:, 0], '\n')
+        # N = 14
+        # ind = np.arange(N)  # the x locations for the groups
+        # width = 0.27        # the width of the bars
 
-    # variance for each sample using the weighted average of the channels
-    outMeasures[:, 1] = weight_average.var(axis=1)
-    #print("Variance: ", outMeasures[:, 1], '\n')
+        # fig = plt.figure()
+        # ax = fig.add_subplot(111)
 
-    # standard deviation for each sample using the weighted average of the channels
-    outMeasures[:, 2] = weight_average.std(axis=1)
-    #print("Standard Deviation: ", outMeasures[:, 2], '\n')
+        # yvals = outMeasuresForEachSample[i,:,0]
+        # rects1 = ax.bar(ind, yvals, width, color='r')
+        # zvals = outMeasuresForEachSample[i,:,1]
+        # rects2 = ax.bar(ind+width, zvals, width, color='g')
+        # kvals = outMeasuresForEachSample[i,:,2]
+        # rects3 = ax.bar(ind+2*width, kvals, width, color='b')
 
-    # number of activities times for each channel
-    outMeasures[:, 3] = [float(e) for e in np.count_nonzero(silences,axis=1)]
-    #print("Silences: ", outMeasures[:, 3], '\n')
+        # ax.set_ylabel('Scores')
+        # ax.set_xticks(ind+width)
+        # ax.set_xticklabels( ('Channel 1','Channel 2','Channel 3','Channel 4','Channel 5','Channel 6','Channel 7','Channel 8','Channel 9','Channel 10','Channel 11','Channel 12','Channel 13','Channel 14') )
 
-    return outMeasures
+        # autolabel(rects1, ax)
+        # autolabel(rects2, ax)
+        # autolabel(rects3, ax)
+
+        # plt.show()
+
+    return outMeasuresForEachSample
     
 def main() :
 
@@ -137,12 +141,12 @@ def main() :
                 # analyse the window
                 # to remove the first 4 measurements
                 if window_number >= 5:
-                    outMeasures = window_analysis(observation_window) 
-
-                    #print(outMeasures, '\n')
-                    #p.plot('plot_freq',weight_average)
-                    for i in range(14):
-                        out.write(struct.pack("=4d",*outMeasures[i]))
+                    data = window_analysis(observation_window) 
+                    
+                    # Each observation window will have X samples (X == observation window size)
+                    # Each data_slice is a sample
+                    for data_slice in data:
+                        np.save(out, data_slice)
                 
                 # reset the observation window
                 observation_window = []              

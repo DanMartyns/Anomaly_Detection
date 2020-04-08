@@ -56,7 +56,6 @@ def calc_score(anomaly_pred, regular_pred):
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     precision = tp/(tp+fp)
     recall = tp/(tp+fn)
-    # Give more importance to regular files
     return 2 * ((precision * recall)/(precision + recall))
 
 def print_results(anomaly_pred, regular_pred):
@@ -89,7 +88,6 @@ def remove_algorithms(score):
         if score[i] < median and (math.floor(score[i-1] - score[i]) >= step or median - score[i] > 2*step):
             values.append(score[i])
 
-    print(len(values))
     return [i for i, x in enumerate(remv) if x in values]
 
 def decide(pred, ignore=[]):
@@ -211,6 +209,7 @@ def main():
     flag = True
     score = []
     for c in classifier:
+        print("Classifier : ", c )
         c.fit(train_data)
              
         # predict
@@ -231,7 +230,7 @@ def main():
             print_results(predict(anomaly_test_files, scaler, c), predict(regular_test_files, scaler, c))
 
     ignore = remove_algorithms(score)
-    print_results(decide(anomaly_pred), decide(regular_pred))
+    #print_results(decide(anomaly_pred), decide(regular_pred))
     fname = print_results(decide(anomaly_pred, ignore=ignore), decide(regular_pred, ignore=ignore))
     print("Ignored algorithms: ", ignore)
     

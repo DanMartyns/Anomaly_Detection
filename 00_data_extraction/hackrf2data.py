@@ -29,7 +29,7 @@ bfilename = label+"_"+dt_string+".bin"
 ON_POSIX = 'posix' in builtin_module_names
 # my_hackrf_sweep -f 2412:2484 -B -l 8 -g 25 -r power1.bin
 cmdpipe = subprocess.Popen([
-    "./my_hackrf_sweep","-f {}".format(fstr),'-B',' -l 8 -g 25 ', "-r {}".format(bfilename)],
+    "./my_hackrf_sweep","-f {}".format(fstr),'-B',' -l 8 -g 30 ', "-r {}".format(bfilename)],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     close_fds=ON_POSIX)
