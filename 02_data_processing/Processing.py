@@ -47,38 +47,38 @@ def window_analysis(observation_window):
         # Split each instance in the 14 Wi-Fi channels
         channels = c.calculate("split_channels", sample[2:])
         
-        # Calculate the metricss for each channel for each sample
+        # Calculate the metrics for each channel for each sample
         for index, channel in enumerate(channels):
             outMeasuresForEachSample[i, index, 0] = c.calculate('weighted_average', channel)
             outMeasuresForEachSample[i, index, 1] = np.var(channel)
             outMeasuresForEachSample[i, index, 2] = len(channel) - np.count_nonzero([int(x) for x in list(map(lambda x: x > threshold, channel))])
 
         # For each channel
-        #print("For each channel: ",outMeasuresForEachSample[i, :,:], sep='\n')
+        print("For each channel: ",outMeasuresForEachSample[i, :,:], sep='\n')
 
-        # N = 14
-        # ind = np.arange(N)  # the x locations for the groups
-        # width = 0.27        # the width of the bars
+        N = 14
+        ind = np.arange(N)  # the x locations for the groups
+        width = 0.27        # the width of the bars
 
-        # fig = plt.figure()
-        # ax = fig.add_subplot(111)
+        fig = plt.figure()
+        ax = fig.add_subplot(111)
 
-        # yvals = outMeasuresForEachSample[i,:,0]
-        # rects1 = ax.bar(ind, yvals, width, color='r')
-        # zvals = outMeasuresForEachSample[i,:,1]
-        # rects2 = ax.bar(ind+width, zvals, width, color='g')
-        # kvals = outMeasuresForEachSample[i,:,2]
-        # rects3 = ax.bar(ind+2*width, kvals, width, color='b')
+        yvals = outMeasuresForEachSample[i,:,0]
+        rects1 = ax.bar(ind, yvals, width, color='r')
+        zvals = outMeasuresForEachSample[i,:,1]
+        rects2 = ax.bar(ind+width, zvals, width, color='g')
+        kvals = outMeasuresForEachSample[i,:,2]
+        rects3 = ax.bar(ind+2*width, kvals, width, color='b')
 
-        # ax.set_ylabel('Scores')
-        # ax.set_xticks(ind+width)
-        # ax.set_xticklabels( ('Channel 1','Channel 2','Channel 3','Channel 4','Channel 5','Channel 6','Channel 7','Channel 8','Channel 9','Channel 10','Channel 11','Channel 12','Channel 13','Channel 14') )
+        ax.set_ylabel('Scores')
+        ax.set_xticks(ind+width)
+        ax.set_xticklabels( ('Channel 1','Channel 2','Channel 3','Channel 4','Channel 5','Channel 6','Channel 7','Channel 8','Channel 9','Channel 10','Channel 11','Channel 12','Channel 13','Channel 14') )
 
-        # autolabel(rects1, ax)
-        # autolabel(rects2, ax)
-        # autolabel(rects3, ax)
+        autolabel(rects1, ax)
+        autolabel(rects2, ax)
+        autolabel(rects3, ax)
 
-        # plt.show()
+        plt.show()
 
     return outMeasuresForEachSample
     
@@ -145,8 +145,12 @@ def main() :
                     
                     # Each observation window will have X samples (X == observation window size)
                     # Each data_slice is a sample
+                    sliced = []
                     for data_slice in data:
-                        np.save(out, data_slice)
+                        for i in range(14):
+                            sliced.extend(data_slice[i])
+                        out.write(struct.pack("42d",*sliced))
+                        sliced = []
                 
                 # reset the observation window
                 observation_window = []              

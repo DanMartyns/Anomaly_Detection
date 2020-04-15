@@ -1,5 +1,6 @@
 import os
 import math
+import time
 import copy
 import pandas
 import struct
@@ -7,6 +8,8 @@ import random
 import pickle
 import argparse
 import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
 from sklearn import svm
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
@@ -16,37 +19,28 @@ from sklearn.metrics import confusion_matrix
 
 def readFileToMatrix(files) :
     assert len(files) > 0
-    fb = open(files[0], "rb")
     
     matrix = []
-    try:
-        while True:
-            # read each line of the file
-            record=fb.read(32)
+    for f in files:
+        fb = open(f, "rb")
+        try:
+            while True:
+                # read each line of the file
+                record=fb.read(336)
+                
+                # break when the line was empty
+                if(len(record) < 336): break
+                
+                # unpack the record
+                line = list(struct.unpack('=42d',record))
+                
+                # append the line to matrix
+                matrix.append(line)
+    
+        finally:
+            fb.close()
 
-            # break when the line was empty
-            if(len(record) < 32): break
-            
-            line = list(struct.unpack('=4d',record))
-
-            matrix.append(line)
-
-        matrix = np.array(matrix)
-
-        if len(files) > 1:
-            for f in files[1:]:
-                f = open(f, "rb")
-                while True:
-                    # read each line of the file
-                    record=fb.read(32)
-                    # break when the line was empty
-                    if(len(record) < 32): break
-
-                    matrix = np.concatenate((matrix, list(struct.unpack('=4d',record))))
-    finally:
-        fb.close()
-
-    return matrix
+    return np.array(matrix)
 
 def calc_score(anomaly_pred, regular_pred):
     an = ((anomaly_pred[anomaly_pred == -1].size)/anomaly_pred.shape[0])*100
@@ -104,6 +98,13 @@ def decide(pred, ignore=[]):
 def predict(files, scaler, clf):
     data = readFileToMatrix(files)
     scaled_data = scaler.transform(data)
+    
+    # Make an instance of the Model
+    pca = PCA(.50)
+
+    pca.fit(scaled_data)
+    scaled_data = pca.transform(scaled_data)
+
     return clf.predict(scaled_data)
 
 def main():
@@ -185,20 +186,27 @@ def main():
 
 
     train_data = readFileToMatrix(args.files)
+
     scaler = StandardScaler()
     scaler.fit(train_data)
     train_data = scaler.transform(train_data)
 
+    # Make an instance of the Model
+    pca = PCA(.50)
+
+    pca.fit(train_data)
+    train_data = pca.transform(train_data)
+
     classifier = []
-    classifier.append(svm.OneClassSVM(gamma='auto', kernel='rbf'))
-    classifier.append(svm.OneClassSVM(gamma=0.0000001, kernel='rbf')) 
-    classifier.append(svm.OneClassSVM(gamma=1, kernel='rbf'))
-    classifier.append(svm.OneClassSVM(kernel='linear'))
-    classifier.append(svm.OneClassSVM(gamma='auto', kernel='poly', degree=1))
-    classifier.append(svm.OneClassSVM(gamma='auto', kernel='poly', degree=2))
-    classifier.append(svm.OneClassSVM(gamma='auto', kernel='poly', degree=5))
-    classifier.append(svm.OneClassSVM(gamma=1, kernel='poly', degree=1))
-    classifier.append(svm.OneClassSVM(gamma=1, kernel='sigmoid'))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='rbf'))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=0.0000001, kernel='rbf')) 
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='rbf'))
+    classifier.append(svm.OneClassSVM(cache_size=1000, kernel='linear'))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=1))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=2))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=5))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='poly', degree=1))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='sigmoid'))
     classifier.append(IsolationForest(behaviour='new', max_samples='auto', contamination=0.1))
     classifier.append(IsolationForest(behaviour='new', max_samples=int(train_data.shape[0]/2), contamination=0.2))
     classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.1))
@@ -209,6 +217,7 @@ def main():
     flag = True
     score = []
     for c in classifier:
+        start = time.time()
         print("Classifier : ", c )
         c.fit(train_data)
              
@@ -228,6 +237,8 @@ def main():
         
         if args.verbose:
             print_results(predict(anomaly_test_files, scaler, c), predict(regular_test_files, scaler, c))
+        
+        print("Demorou ", time.time()-start, " seconds")
 
     ignore = remove_algorithms(score)
     #print_results(decide(anomaly_pred), decide(regular_pred))
