@@ -37,6 +37,7 @@ def main():
     plt.ion()
     plt.show()
     fig=plt.figure()
+
     fb=open(args.file,'rb')
 
     blen=fb.read(36)

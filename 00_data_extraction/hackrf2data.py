@@ -18,18 +18,22 @@ f2=2495
 fstr="{}:{}".format(f1,f2)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-l', '--label', help='wildcard for the file')
+parser.add_argument('-w', '--wildcard', help='wildcard for the file')
+parser.add_argument('-l', '--lna', help='RX LNA (IF) gain, 0-40dB, 8dB steps')
+parser.add_argument('-g', '--vga', help='RX VGA (baseband) gain, 0-62dB, 2dB steps')
 args = parser.parse_args()
-label = args.label 
+label = args.wildcard 
+l = args.lna
+g = args.vga
 
 now = datetime.now()
 dt_string = now.strftime("%d-%m-%Y_%H_%M_%S")
 bfilename = label+"_"+dt_string+".bin"
 
 ON_POSIX = 'posix' in builtin_module_names
-# my_hackrf_sweep -f 2412:2484 -B -l 8 -g 25 -r power1.bin
-cmdpipe = subprocess.Popen([
-    "./my_hackrf_sweep","-f {}".format(fstr),'-B',' -l 8 -g 30 ', "-r {}".format(bfilename)],
+# my_hackrf_sweep -f 2412:2484 -B -l 8 -g 20 -r power1.bin
+
+cmdpipe = subprocess.Popen(["./my_hackrf_sweep","-f {}".format(fstr),'-B',' -l '+l+' -g '+g, "-r {}".format(bfilename)],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     close_fds=ON_POSIX)

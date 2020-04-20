@@ -1,25 +1,45 @@
 #!/bin/sh
 
-if [ ! -d $(pwd)/data ]; then
-  mkdir -p $(pwd)/data;
-fi
+recursiveDir(){
+    for f in $1/*
+    do 
+        if [ -d "$f" ]
+        then 
+            #echo "Directório " $f
+            size=$(echo $f | cut -d'/' -f 1- | tr "/" "\n" | wc -l)
+            file=$(echo $f | cut -d'/' -f 3-$size)
+            if [ ! -d $(pwd)/$file ]; then
+                mkdir -p $(pwd)/$file;
+            fi
+            recursiveDir $f
+        elif [[ -f "$f" && $f == *".bin"* ]]
+        then
+            #echo "É um ficheiro " $f
+            path=$(echo $f | cut -d'/' -f 3-)
 
-DIRECTORY=../00_data_extraction/data/*
-DIRECTORY_OUT=data/
-suffix=.dat
-
-for f in $DIRECTORY; do
-
-  file=$(echo $f | cut -d'.' -f 3)
-  filename=$(echo $file | cut -d'/' -f 4)
-
-  file_count=$(find $DIRECTORY_OUT -name "*$filename$suffix" | wc -l)
-
-  if [ $file_count -gt 0 ]; then
-      echo "Warning: $filename$suffix found $file_count times in $DIRECTORY_OUT!"
-  else
-      echo "The directory $DIRECTORY_OUT not contain $filename$suffix"
-      python3 hackrfreadbinfile.py -f "${f}"
-  fi
-
-done
+            size=$(echo $path | cut -d'/' -f 1- | tr "/" "\n" | wc -l)       
+            dir=$(echo $path | cut -d'/' -f 1-$((size-=1)))
+            
+            file=$(echo $path | cut -d'/' -f $size- )
+            filename=$(echo $file | cut -d'.' -f 1)
+            
+            file_count=$(find $(pwd)/$dir -name "*$filename.dat" | wc -l)
+            
+            if [ $file_count -gt 0 ]; then
+                echo "Warning: $filename.dat found $file_count times in $dir!"
+            else
+                echo "The directory $dir not contain $filename.dat"
+                if [[ $filename == *"vazio"* ]];
+                then
+                    txt=$(find ../00_data_extraction/$dir -iname '*.txt')
+                    python3 hackrfreadbinfile.py -f $f -fi $txt
+                else
+                    python3 hackrfreadbinfile.py -f $f
+                fi
+                mv $(pwd)/data/$filename.dat $(pwd)/$dir
+            fi
+        fi
+    done
+}
+DIRECTORY="../00_data_extraction/data"
+recursiveDir $DIRECTORY

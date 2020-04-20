@@ -9,8 +9,7 @@ import argparse
 import time
 import numpy as np
 from sys import builtin_module_names
-#import matplotlib.pyplot as plt
-#import matplotlib.colors as colors
+from datetime import datetime
 
 ########################################
 
@@ -32,11 +31,18 @@ def main():
     # input arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--file', help='filename')
+    parser.add_argument('-fi', '--filter', help='auxiliar file to filter the main file')
     args = parser.parse_args()
 
-    #plt.ion()
-    #plt.show()
-    #fig=plt.figure()
+    if args.filter:
+        filter = open(args.filter,'r')
+        one_char = filter.read(1)
+        filter.seek(0)
+        if one_char:
+            a = filter.readline()
+            size_of_line = len(a)
+        
+
     f = args.file.split("/")[-1]
     fb=open(args.file,'rb')
     f = f.replace("bin","dat")
@@ -51,7 +57,6 @@ def main():
 
     fStep=(data[4]-data[3])/1e6/nPow
 
-
     print(nPow,Rlen,first_time,fStep)
 
     fb.seek(0)
@@ -63,9 +68,9 @@ def main():
 
             data=struct.unpack('=IQQQQ{}f'.format(nPow),rec)
                 
-            time=data[1]+data[2]/1e6
+            times=data[1]+data[2]/1e6
             
-            if time>first_time:
+            if times>first_time:
                 f1=(int)(data[3]/1e6)
                 f2=(int)(lastf/1e6)
                 break
@@ -90,45 +95,70 @@ def main():
         t=np.arange(nt)
         S=-90*np.ones((nt,nf))
         sfA=-90*np.ones((1,nf))
-
+        ignored = False
+    
         while True:
             rec=fb.read(Rlen)
             if(len(rec)<Rlen): 
                 break
 
             data=struct.unpack('=IQQQQ{}f'.format(nPow),rec)
-            
-            time=data[1]+data[2]/1e6
-            fidx=((int)(data[3]/1e6)-f1)
 
-            sfA[0,fidx:fidx+nPow]=data[5:]
-            sfA[0,fidx:fidx+nPow]=np.maximum(sfA[0,fidx:fidx+nPow],data[5:])
-            
-            if time>last_time:
-                final = [n, time]
-                for e in sfA.tolist():
-                    final += e
-                w.write(struct.pack("=102d",*final)) 
-                avgpow=np.append(avgpow,np.mean(sfA))
-                S=np.vstack((sfA,S))[:nt,:]  
-                sfA=np.zeros((1,nf))
-                n+=1
-                last_time=time
-                    
-            # if n%50==0:
-            #     plt.pcolormesh(frq,t,S,norm=colors.SymLogNorm(linthresh=0.03, linscale=0.03,vmin=-90, vmax=-50))
-            #     plt.draw()
-            #     fig.canvas.flush_events()
-            #     plt.clf()
+            # We want get only the data lines who belongs to between begin and end timestamps who're registered in the filter file
+            # if the filter flag is True
+            if args.filter:
+                # Check if file is empty by reading first character in it
+                if one_char:          
+                    while True:
+                        # get the timestamp from the main file
+                        et = time.mktime(datetime.fromtimestamp(data[1]).timetuple())
+
+                        # get the timestamps from the filter file   
+                        epoch_time = a.replace('\n','').split(" ")
+                        
+                        # convert them to datatime types
+                        epoch_time_begin = time.mktime(datetime.strptime(epoch_time[0]+" "+epoch_time[1], '%Y-%m-%d %H:%M:%S.%f').timetuple())
+                        epoch_time_end = time.mktime(datetime.strptime(epoch_time[2]+" "+epoch_time[3], '%Y-%m-%d %H:%M:%S.%f').timetuple())
+                        
+                        if et < epoch_time_begin:
+                            print("IGNORADO |","Et: ", et, "Begin: ",epoch_time_begin,"End: ", epoch_time_end)
+                            ignored = True
+                            break
+                        
+                        # if the et timestamp is greater than epoch_time_end 
+                        elif et > epoch_time_end:
+                            print("FORA DO INTERVALO |","Et: ", et, "Begin: ",epoch_time_begin,"End: ", epoch_time_end)                                            
+                            a = filter.readline()                        
+                            if len(a) < size_of_line:
+                                break
+
+                        elif (et > epoch_time_begin and et < epoch_time_end) or (et == epoch_time_begin) or (et == epoch_time_end):
+                            print("PERTENCE AO INTERVALO |","Et: ",data[1], "Begin: ",epoch_time_begin,"End: ", epoch_time_end)
+                            break
+  
+            if ignored:
+                ignored = False
+                continue
+            else:
+                times=data[1]+data[2]/1e6
+                fidx=((int)(data[3]/1e6)-f1)
+                sfA[0,fidx:fidx+nPow]=data[5:]
+                sfA[0,fidx:fidx+nPow]=np.maximum(sfA[0,fidx:fidx+nPow],data[5:])
                 
-        #plt.figure(2)
-        #plt.plot(avgpow)   
-        #waitforEnter()
-
-    #except KeyboardInterrupt:
-    #    print(">>> Interrupt received, stopping...")
+                if times>last_time:
+                    final = [n, times]
+                    for e in sfA.tolist():
+                        final += e
+                    w.write(struct.pack("=102d",*final)) 
+                    avgpow=np.append(avgpow,np.mean(sfA))
+                    S=np.vstack((sfA,S))[:nt,:]  
+                    sfA=np.zeros((1,nf))
+                    n+=1
+                    last_time=times
     finally:
         fb.close()
+        if args.filter:
+            filter.close()
         w.close()
 
 if __name__ == '__main__':
