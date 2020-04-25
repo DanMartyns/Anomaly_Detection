@@ -13,7 +13,7 @@ import matplotlib.colors as colors
 from datetime import datetime
 
 f1=2401
-f2=2495
+f2=2473#2483
 
 fstr="{}:{}".format(f1,f2)
 
