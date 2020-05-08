@@ -2,6 +2,7 @@
 import math
 import sys
 import os
+import math
 import struct
 import subprocess
 import threading
@@ -53,7 +54,7 @@ def main():
     nPow=int((data[0]-16)/4)
     Rlen=data[0]+4+16
 
-    first_time=data[1]+data[2]/1e6
+    first_time=last_time=data[1]+data[2]/1e6
 
     fStep=(data[4]-data[3])/1e6/nPow
 
@@ -61,34 +62,42 @@ def main():
 
     fb.seek(0)
 
+    i = 0
+    lines = 0
     ####
     while True:
-            rec=fb.read(Rlen)
-            if(len(rec)<Rlen): break
+        rec=fb.read(Rlen)
+        lines+=1
+        if(len(rec)<Rlen): break
 
-            data=struct.unpack('=IQQQQ{}f'.format(nPow),rec)
-                
-            times=data[1]+data[2]/1e6
+        data=struct.unpack('=IQQQQ{}f'.format(nPow),rec)
             
-            if times>first_time:
-                f1=(int)(data[3]/1e6)
+        times=data[1]+data[2]/1e6
+        
+        # For some reason in the extracted data, the sample was supposed to have 
+        # 20 lines, 5 frequencies and 5 power signals each, but the first sample
+        # don't have this pattern, so we get the min and max frequency from the 
+        # fifth sample, to garente that the min and max frequency is the correct one         
+        if times>first_time:
+            if i==5:
+                f1=(int)(data[3]/1e6) 
                 f2=(int)(lastf/1e6)
                 break
+            first_time=last_time=data[1]+data[2]/1e6
+            i+=1
+        lastf=data[4]
+        
             
-            lastf=data[4]
-            
-    nf=(int)((f2-f1)/fStep)
+    nf=(int)(((f2-f1)/fStep))
     frq=np.arange(f1,f2,fStep)
     print(f1,f2)
     ####
 
     print("Start! {}, {}".format(Rlen,nPow))
-
     avgpow=np.array([])
     
-
+    fb.seek(lines*Rlen)
     try:
-        last_time=0
         nPow=5
         n=0
         nt=500
@@ -99,11 +108,12 @@ def main():
     
         while True:
             rec=fb.read(Rlen)
+            
             if(len(rec)<Rlen): 
                 break
 
             data=struct.unpack('=IQQQQ{}f'.format(nPow),rec)
-
+            
             # We want get only the data lines who belongs to between begin and end timestamps who're registered in the filter file
             # if the filter flag is True
             if args.filter:
@@ -113,6 +123,9 @@ def main():
                         # get the timestamp from the main file
                         et = time.mktime(datetime.fromtimestamp(data[1]).timetuple())
 
+                        if len(a) < size_of_line:
+                            ignored=True
+                            break
                         # get the timestamps from the filter file   
                         epoch_time = a.replace('\n','').split(" ")
                         
@@ -121,19 +134,17 @@ def main():
                         epoch_time_end = time.mktime(datetime.strptime(epoch_time[2]+" "+epoch_time[3], '%Y-%m-%d %H:%M:%S.%f').timetuple())
                         
                         if et < epoch_time_begin:
-                            print("IGNORADO |","Et: ", et, "Begin: ",epoch_time_begin,"End: ", epoch_time_end)
+                            #print("IGNORADO |","Et: ", et, "Begin: ",epoch_time_begin,"End: ", epoch_time_end)
                             ignored = True
                             break
                         
                         # if the et timestamp is greater than epoch_time_end 
                         elif et > epoch_time_end:
-                            print("FORA DO INTERVALO |","Et: ", et, "Begin: ",epoch_time_begin,"End: ", epoch_time_end)                                            
+                            #print("FORA DO INTERVALO |","Et: ", et, "Begin: ",datetime.strptime(epoch_time[0]+" "+epoch_time[1], '%Y-%m-%d %H:%M:%S.%f'), epoch_time_begin,"End: ",datetime.strptime(epoch_time[2]+" "+epoch_time[3], '%Y-%m-%d %H:%M:%S.%f'), epoch_time_end)                                            
                             a = filter.readline()                        
-                            if len(a) < size_of_line:
-                                break
 
                         elif (et > epoch_time_begin and et < epoch_time_end) or (et == epoch_time_begin) or (et == epoch_time_end):
-                            print("PERTENCE AO INTERVALO |","Et: ",data[1], "Begin: ",epoch_time_begin,"End: ", epoch_time_end)
+                            #print("PERTENCE AO INTERVALO |","Et: ",et, "Begin: ", epoch_time_begin, "End: ",epoch_time_end) 
                             break
   
             if ignored:
@@ -141,20 +152,26 @@ def main():
                 continue
             else:
                 times=data[1]+data[2]/1e6
-                fidx=((int)(data[3]/1e6)-f1)
-                sfA[0,fidx:fidx+nPow]=data[5:]
-                sfA[0,fidx:fidx+nPow]=np.maximum(sfA[0,fidx:fidx+nPow],data[5:])
                 
                 if times>last_time:
-                    final = [n, times]
+                    final = [n, times]                    
                     for e in sfA.tolist():
+                        # Some measurements fail, which causes some values to come with the inf value
+                        if any(np.isinf(e)):
+                            e[:] = [x if not np.isinf(x) else -90 for x in e]
                         final += e
-                    w.write(struct.pack("=102d",*final)) 
+
+                    if len(final) == 82:
+                        w.write(struct.pack("=82d",*final)) 
                     avgpow=np.append(avgpow,np.mean(sfA))
                     S=np.vstack((sfA,S))[:nt,:]  
                     sfA=np.zeros((1,nf))
                     n+=1
                     last_time=times
+
+                fidx=((int)(data[3]/1e6)-f1)
+                sfA[0,fidx:fidx+nPow]=data[5:]
+                sfA[0,fidx:fidx+nPow]=np.maximum(sfA[0,fidx:fidx+nPow],data[5:])            
     finally:
         fb.close()
         if args.filter:

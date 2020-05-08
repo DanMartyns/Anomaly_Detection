@@ -11,19 +11,25 @@ if [ ! -d $(pwd)/data/$dir ]; then
   mkdir -p $(pwd)/data/$dir;
 fi
 
-counter=1
-while [ $counter -le $1 ]
+counter=0
+while [ $((counter+=1)) -le $1 ]
     do
         echo **Extração nr $counter**
-        if [ $2 == "vazio"]; 
-        then
-          python3 simulateHumanBluClient.py &
-        fi 
+        now=$(date +"%d-%m-%y#%H-%M")
+        if [ ! -d $(pwd)/data/$dir/$now ]; then
+          mkdir -p $(pwd)/data/$dir/$now;
+        fi
+        if [ $2 == 'vazio' ]; then
+          echo "-------------------> Servidor Bluetooth ligado"
+          cd ../DataSimulation
+          sudo sh executeServer.sh $5 $dir/$now
+        fi
+        cd ../00_data_extraction
         timeout $5 python3 hackrf2data.py -w $2 -l $3 -g $4
-        sleep 3
-        $((counter+=1))
+        rename "s/ //" *.bin
+        mv *.bin $(pwd)/data/$dir/$now
+        sleep 10
     done
 
-rename "s/ //" *.bin
+sudo chown -R danielmartins data/$dir/
 
-mv *.bin $(pwd)/data/$dir

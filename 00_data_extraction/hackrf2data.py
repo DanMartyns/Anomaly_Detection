@@ -22,6 +22,7 @@ parser.add_argument('-w', '--wildcard', help='wildcard for the file')
 parser.add_argument('-l', '--lna', help='RX LNA (IF) gain, 0-40dB, 8dB steps')
 parser.add_argument('-g', '--vga', help='RX VGA (baseband) gain, 0-62dB, 2dB steps')
 args = parser.parse_args()
+
 label = args.wildcard 
 l = args.lna
 g = args.vga

@@ -1,37 +1,44 @@
 #!/bin/sh
 
-# create the data folder if it's not exists
-if [ ! -d $(pwd)/data ]; then
-  mkdir -p $(pwd)/data;
-fi
-
-DIRECTORY=../01_data_conversion/data/*
-DIRECTORY_OUT=data/
-suffix=.dat
-
+recursiveDir(){
+    for f in $1/*
+    do 
+        if [ -d "$f" ]
+        then 
+            #echo "Directório " $f
+            size=$(echo $f | cut -d'/' -f 1- | tr "/" "\n" | wc -l)
+            file=$(echo $f | cut -d'/' -f 3-$size)
+            if [ ! -d $(pwd)/$file ]; then
+                mkdir -p $(pwd)/$file;
+            fi
+            recursiveDir $f
+        elif [ -f "$f" ]
+        then
+            #echo "É um ficheiro " $f
+            path=$(echo $f | cut -d'/' -f 3-)
+            
+            size=$(echo $path | cut -d'/' -f 1- | tr "/" "\n" | wc -l)       
+            dir=$(echo $path | cut -d'/' -f 1-$((size-=1)))
+            file=$(echo $path | cut -d'/' -f $size- )
+            file_count=$(find $(pwd)/$dir -name "*$file" | wc -l)
+            
+            if [ $file_count -gt 0 ]; then
+                echo "Warning: $file found $file_count times in $dir!"
+            else
+                echo "The directory $dir not contain $file"
+                python3 Processing.py -f "${f}" -ws 1000 -wo 200
+                mv $(pwd)/data/$file $(pwd)/$dir
+            fi
+            echo
+        fi
+    done
+}
 start=$SECONDS
 
-for f in $DIRECTORY; do
-
-  # get only the name file
-  file=$(echo $f | cut -d'.' -f 3)
-  # get the name file without extension
-  filename=$(echo $file | cut -d'/' -f 4)
-
-  # count the number of files with a specific name
-  file_count=$(find $DIRECTORY_OUT -name "*$filename$suffix" | wc -l)
-
-  # check if the output directory has the already processed file 
-  if [ $file_count -gt 0 ]; then
-      echo "Warning: $filename$suffix found $file_count times in $DIRECTORY_OUT!"
-  # if not, the file is processed
-  else
-      echo "The directory $DIRECTORY_OUT not contain $filename$suffix"
-      python3 Processing.py -f "${f}" -ws 50 -wo 5 &
-  fi
-
-done
+DIRECTORY="../01_data_conversion/data"
+recursiveDir $DIRECTORY
 
 duration=$(( SECONDS - start ))
-
 echo "Duration : $duration" 
+
+

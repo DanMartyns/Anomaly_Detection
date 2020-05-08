@@ -23,24 +23,29 @@ def readFileToMatrix(files) :
     matrix = []
     for f in files:
         fb = open(f, "rb")
+        print("File: ",f)
         try:
             while True:
                 # read each line of the file
-                record=fb.read(336)
+                record=fb.read(24)
                 
                 # break when the line was empty
-                if(len(record) < 336): break
+                if(len(record) < 24): break
                 
                 # unpack the record
-                line = list(struct.unpack('=42d',record))
-                
+                line = list(struct.unpack('=3d',record))
+
+                if any([np.isnan(x) for x in line]):
+                    print(line)
+
                 # append the line to matrix
                 matrix.append(line)
     
         finally:
             fb.close()
 
-    return np.array(matrix)
+    matrix = np.array(matrix)
+    return matrix
 
 def calc_score(anomaly_pred, regular_pred):
     an = ((anomaly_pred[anomaly_pred == -1].size)/anomaly_pred.shape[0])*100
@@ -186,7 +191,6 @@ def main():
 
 
     train_data = readFileToMatrix(args.files)
-
     scaler = StandardScaler()
     scaler.fit(train_data)
     train_data = scaler.transform(train_data)
@@ -198,19 +202,19 @@ def main():
     train_data = pca.transform(train_data)
 
     classifier = []
-    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='rbf'))
-    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=0.0000001, kernel='rbf')) 
-    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='rbf'))
-    classifier.append(svm.OneClassSVM(cache_size=1000, kernel='linear'))
-    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=1))
-    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=2))
-    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=5))
-    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='poly', degree=1))
-    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='sigmoid'))
-    classifier.append(IsolationForest(behaviour='new', max_samples='auto', contamination=0.1))
-    classifier.append(IsolationForest(behaviour='new', max_samples=int(train_data.shape[0]/2), contamination=0.2))
-    classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.1))
-    classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.2))
+    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='rbf'))
+    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma=0.0000001, kernel='rbf')) 
+    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='rbf'))
+    # classifier.append(svm.OneClassSVM(cache_size=1000, kernel='linear'))
+    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=1))
+    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=2))
+    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=5))
+    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='poly', degree=1))
+    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='sigmoid'))
+    # classifier.append(IsolationForest(behaviour='new', max_samples='auto', contamination=0.1))
+    # classifier.append(IsolationForest(behaviour='new', max_samples=int(train_data.shape[0]/2), contamination=0.2))
+    # classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.1))
+    # classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.2))
     classifier.append(EllipticEnvelope(support_fraction=0.9, contamination=0.1))
     classifier.append(EllipticEnvelope(support_fraction=0.9, contamination=0.2))
 

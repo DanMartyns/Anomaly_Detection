@@ -40,11 +40,11 @@ class Metrics(object):
         channels = []
         
         # for each channel
-        for c in range(13):
+        for c in range(11):
             # take the instance and divide it into channels
             channels.append([p for index, p in enumerate(sample) if index >= ( 0 + 5*c ) and index <= ( 22 + 5*c ) ])
         
-        channels.append([p for index, p in enumerate(sample) if index >= 72 and index <= 94 ])
+        #channels.append([p for index, p in enumerate(sample) if index >= 72 and index <= 94 ])
         
         # Print the channels splitted
         # for c in range(14):
@@ -66,10 +66,8 @@ class Metrics(object):
     '''        
     def weighted_average(self, channel):
         wei_avg = []
-
         weight = []
-
-        for ind, i in enumerate(reversed(channel[:11])):
+        for ind, i in enumerate(reversed(channel[:11])):    
             wei_avg.insert(0, channel[ind] * (0.8/(2**ind)))
             weight.append(0.8/(2**ind))
         
