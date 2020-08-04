@@ -1,6 +1,6 @@
 #!/bin/sh
 gnome-terminal \
-    --title=SampleClient0 -- bash -c "python3 socketClient.py 7C:76:35:1C:47:3C ca84476c-863a-11ea-bc55-0242ac130003; bash" &\
+    --title=SampleClient0 -- bash -c " python3 socketClient.py -u ca84476c-863a-11ea-bc55-0242ac130003 -s 68:EC:C5:2C:A8:7A; bash" &\
 # gnome-terminal \
 #     --title=SampleClient1 -- bash -c "python3 socketClient.py 7C:76:35:1C:47:3C e32e38b8-863a-11ea-bc55-0242ac130003; bash" &\
 # gnome-terminal \

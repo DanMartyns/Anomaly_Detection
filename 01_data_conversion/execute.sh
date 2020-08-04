@@ -37,7 +37,7 @@ recursiveDir(){
                     python3 hackrfreadbinfile.py -f $f -fi $txt
                 else
                     echo "Input File: "$f
-                    python3 hackrfreadbinfile.py -f $f
+                    python3 hackrfreadbinfile.py -f $f 
                 fi
                 mv $(pwd)/data/$filename.dat $(pwd)/$dir
             fi

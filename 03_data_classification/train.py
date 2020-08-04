@@ -11,11 +11,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from sklearn import svm
+from matplotlib import pyplot
 from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
 from sklearn.neighbors import LocalOutlierFactor
 from sklearn.covariance import EllipticEnvelope
 from sklearn.metrics import confusion_matrix
+from pandas.plotting import autocorrelation_plot
 
 def readFileToMatrix(files) :
     assert len(files) > 0
@@ -23,20 +25,16 @@ def readFileToMatrix(files) :
     matrix = []
     for f in files:
         fb = open(f, "rb")
-        print("File: ",f)
         try:
             while True:
                 # read each line of the file
-                record=fb.read(24)
+                record=fb.read(32)
                 
                 # break when the line was empty
-                if(len(record) < 24): break
+                if(len(record) < 32): break
                 
                 # unpack the record
-                line = list(struct.unpack('=3d',record))
-
-                if any([np.isnan(x) for x in line]):
-                    print(line)
+                line = list(struct.unpack('=4d',record))
 
                 # append the line to matrix
                 matrix.append(line)
@@ -105,7 +103,7 @@ def predict(files, scaler, clf):
     scaled_data = scaler.transform(data)
     
     # Make an instance of the Model
-    pca = PCA(.50)
+    pca = PCA(0.9)
 
     pca.fit(scaled_data)
     scaled_data = pca.transform(scaled_data)
@@ -151,10 +149,12 @@ def main():
     for f in args.files:
         if args.wildcard in f:
             train_files.append(f)
-            print(f)
         else:
             anomaly_test_files.append(f)
+
+    print("Ficheiros de Treino: ", *train_files, sep='\n')
     
+    # begin process of deciding test and train files
     ratio = 0.8
     remove_elems = math.floor(ratio*len(train_files))
 
@@ -189,6 +189,8 @@ def main():
             else:
                 random.shuffle(train_files)
 
+    print("Regular Files: ", *regular_test_files, sep="\n")
+    print("Anomaly Files: ", *anomaly_test_files, sep="\n")
 
     train_data = readFileToMatrix(args.files)
     scaler = StandardScaler()
@@ -196,7 +198,7 @@ def main():
     train_data = scaler.transform(train_data)
 
     # Make an instance of the Model
-    pca = PCA(.50)
+    pca = PCA(.9)
 
     pca.fit(train_data)
     train_data = pca.transform(train_data)
@@ -205,24 +207,24 @@ def main():
     # classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='rbf'))
     # classifier.append(svm.OneClassSVM(cache_size=1000, gamma=0.0000001, kernel='rbf')) 
     # classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='rbf'))
-    # classifier.append(svm.OneClassSVM(cache_size=1000, kernel='linear'))
-    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=1))
-    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=2))
-    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=5))
-    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='poly', degree=1))
-    # classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='sigmoid'))
-    # classifier.append(IsolationForest(behaviour='new', max_samples='auto', contamination=0.1))
-    # classifier.append(IsolationForest(behaviour='new', max_samples=int(train_data.shape[0]/2), contamination=0.2))
-    # classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.1))
-    # classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.2))
+    classifier.append(svm.OneClassSVM(cache_size=1000, kernel='linear'))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=1))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=2))
+    #classifier.append(svm.OneClassSVM(cache_size=1000, gamma='auto', kernel='poly', degree=5)) # quase 4horas para treinar
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='poly', degree=1))
+    classifier.append(svm.OneClassSVM(cache_size=1000, gamma=1, kernel='sigmoid'))
+    classifier.append(IsolationForest(behaviour='new', max_samples='auto', contamination=0.1))
+    classifier.append(IsolationForest(behaviour='new', max_samples=int(train_data.shape[0]/2), contamination=0.2))
+    classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.1))
+    classifier.append(LocalOutlierFactor(n_neighbors=20, novelty=True, contamination=0.2))
     classifier.append(EllipticEnvelope(support_fraction=0.9, contamination=0.1))
     classifier.append(EllipticEnvelope(support_fraction=0.9, contamination=0.2))
 
     flag = True
     score = []
-    for c in classifier:
+    for index, 	c in enumerate(classifier):
         start = time.time()
-        print("Classifier : ", c )
+        print("Classifier nrº",index," : ", c )
         c.fit(train_data)
              
         # predict

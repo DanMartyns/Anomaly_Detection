@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link rel="stylesheet" type="text/css" href="index.css">
+    </head>
+<body>
+    <main class="gallery">
+        {% for image in images %}
+        <img src={{url_for('static', filename=image )}}  alt="Sample photo" style="width: 410px; object-position: -105px 10px;">
+        {% endfor %}
+    </main>
+</body>
+
+</html>

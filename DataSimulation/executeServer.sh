@@ -1,7 +1,7 @@
 #!/bin/sh
 sudo hciconfig hci0 piscan 
 gnome-terminal \
-    --title=SampleServer0 -- bash -c "timeout $1 python3 socketServer.py -u ca84476c-863a-11ea-bc55-0242ac130003 -n SampleServer0 -d $2; exit; bash" &\
+    --title=SampleServer0 -- bash -c "timeout $1 python3 socketServer.py -u ca84476c-863a-11ea-bc55-0242ac130003 -n SampleServer0 -d $2 -t $3 ; bash; exit;" &\
 # gnome-terminal \
 #     --title=SampleServer1 -- bash -c "python3 socketServer.py -u e32e38b8-863a-11ea-bc55-0242ac130003 -n SampleServer1 -d $1; bash" &\
 # gnome-terminal \

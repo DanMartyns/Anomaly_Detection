@@ -31,7 +31,7 @@ def main():
 
     # input arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--file', help='filename')
+    parser.add_argument('-f', '--file', help='filename', required=True)
     parser.add_argument('-fi', '--filter', help='auxiliar file to filter the main file')
     args = parser.parse_args()
 
@@ -79,7 +79,7 @@ def main():
         # don't have this pattern, so we get the min and max frequency from the 
         # fifth sample, to garente that the min and max frequency is the correct one         
         if times>first_time:
-            if i==5:
+            if i==10:
                 f1=(int)(data[3]/1e6) 
                 f2=(int)(lastf/1e6)
                 break
@@ -160,9 +160,9 @@ def main():
                         if any(np.isinf(e)):
                             e[:] = [x if not np.isinf(x) else -90 for x in e]
                         final += e
-
-                    if len(final) == 82:
-                        w.write(struct.pack("=82d",*final)) 
+                    
+                    if len(final) == 102:
+                        w.write(struct.pack("=102d",*final)) 
                     avgpow=np.append(avgpow,np.mean(sfA))
                     S=np.vstack((sfA,S))[:nt,:]  
                     sfA=np.zeros((1,nf))

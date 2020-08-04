@@ -15,14 +15,14 @@ counter=0
 while [ $((counter+=1)) -le $1 ]
     do
         echo **Extração nr $counter**
-        now=$(date +"%d-%m-%y#%H-%M")
+        now=$(date +"%y-%m-%d#%H-%M")
         if [ ! -d $(pwd)/data/$dir/$now ]; then
           mkdir -p $(pwd)/data/$dir/$now;
         fi
-        if [ $2 == 'vazio' ]; then
+        if [ $2 == 'vazio' ] || [ $2 == 'mixed' ]; then
           echo "-------------------> Servidor Bluetooth ligado"
           cd ../DataSimulation
-          sudo sh executeServer.sh $5 $dir/$now
+          sudo sh executeServer.sh $5 $dir/$now $2
         fi
         cd ../00_data_extraction
         timeout $5 python3 hackrf2data.py -w $2 -l $3 -g $4
