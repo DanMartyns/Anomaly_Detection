@@ -46,8 +46,7 @@ def main():
 
     f = args.file.split("/")[-1]
     fb=open(args.file,'rb')
-    f = f.replace("bin","dat")
-    w = open("data/"+f, 'wb')
+    w = open("data/"+f.replace(".bin", ".dat"), 'wb')
 
     blen=fb.read(36)
     data=struct.unpack('=IQQQQ',blen)
@@ -105,6 +104,7 @@ def main():
         S=-90*np.ones((nt,nf))
         sfA=-90*np.ones((1,nf))
         ignored = False
+        intervalIn = False
     
         while True:
             rec=fb.read(Rlen)
@@ -123,46 +123,53 @@ def main():
                         # get the timestamp from the main file
                         et = time.mktime(datetime.fromtimestamp(data[1]).timetuple())
 
+                        # get the timestamps from the filter file   
+                        epoch_time = a.replace('\n','').split(" ")
+
                         if len(a) < size_of_line:
                             ignored=True
                             break
-                        # get the timestamps from the filter file   
-                        epoch_time = a.replace('\n','').split(" ")
                         
                         # convert them to datatime types
                         epoch_time_begin = time.mktime(datetime.strptime(epoch_time[0]+" "+epoch_time[1], '%Y-%m-%d %H:%M:%S.%f').timetuple())
                         epoch_time_end = time.mktime(datetime.strptime(epoch_time[2]+" "+epoch_time[3], '%Y-%m-%d %H:%M:%S.%f').timetuple())
                         
-                        if et < epoch_time_begin:
-                            #print("IGNORADO |","Et: ", et, "Begin: ",epoch_time_begin,"End: ", epoch_time_end)
-                            ignored = True
-                            break
-                        
                         # if the et timestamp is greater than epoch_time_end 
-                        elif et > epoch_time_end:
-                            #print("FORA DO INTERVALO |","Et: ", et, "Begin: ",datetime.strptime(epoch_time[0]+" "+epoch_time[1], '%Y-%m-%d %H:%M:%S.%f'), epoch_time_begin,"End: ",datetime.strptime(epoch_time[2]+" "+epoch_time[3], '%Y-%m-%d %H:%M:%S.%f'), epoch_time_end)                                            
-                            a = filter.readline()                        
-
-                        elif (et > epoch_time_begin and et < epoch_time_end) or (et == epoch_time_begin) or (et == epoch_time_end):
-                            #print("PERTENCE AO INTERVALO |","Et: ",et, "Begin: ", epoch_time_begin, "End: ",epoch_time_end) 
+                        if et > epoch_time_end:
+                            # print("FORA DO INTERVALO |","Et: ", et, "Begin: ",epoch_time_begin, "End: ", epoch_time_end)                                            
+                            a = filter.readline()
+                            intervalIn = False
                             break
-  
+                        elif et < epoch_time_begin:
+                            # print("IGNORADO |","Et: ", et, "Begin: ",epoch_time_begin,"End: ", epoch_time_end)
+                            intervalIn = False
+                            break    
+                        elif (et > epoch_time_begin and et < epoch_time_end) or (et == epoch_time_begin) or (et == epoch_time_end):
+                            # print("PERTENCE AO INTERVALO |","Et: ",et, "Begin: ", epoch_time_begin, "End: ",epoch_time_end) 
+                            intervalIn = True
+                            break                                      
+
             if ignored:
                 ignored = False
                 continue
             else:
-                times=data[1]+data[2]/1e6
+                times = data[1]+data[2]/1e6
                 
-                if times>last_time:
+                if times > last_time:
                     final = [n, times]                    
                     for e in sfA.tolist():
                         # Some measurements fail, which causes some values to come with the inf value
                         if any(np.isinf(e)):
                             e[:] = [x if not np.isinf(x) else -90 for x in e]
+                        e[:] = e[:84]
                         final += e
+                        if intervalIn:
+                            final.append(1)
+                        else:
+                            final.append(0)
                     
-                    if len(final) == 102:
-                        w.write(struct.pack("=102d",*final)) 
+                    if len(final) == 87:
+                        w.write(struct.pack("=87d",*final)) 
                     avgpow=np.append(avgpow,np.mean(sfA))
                     S=np.vstack((sfA,S))[:nt,:]  
                     sfA=np.zeros((1,nf))

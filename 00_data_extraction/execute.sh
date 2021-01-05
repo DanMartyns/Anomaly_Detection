@@ -19,7 +19,7 @@ while [ $((counter+=1)) -le $1 ]
         if [ ! -d $(pwd)/data/$dir/$now ]; then
           mkdir -p $(pwd)/data/$dir/$now;
         fi
-        if [ $2 == 'vazio' ] || [ $2 == 'mixed' ]; then
+        if [[ $2 == *"anomaly"* ]] || [[ $2 == *"mixed"* ]]; then
           echo "-------------------> Servidor Bluetooth ligado"
           cd ../DataSimulation
           sudo sh executeServer.sh $5 $dir/$now $2

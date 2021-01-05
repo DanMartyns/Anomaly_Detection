@@ -7,6 +7,7 @@ import subprocess
 import threading
 import argparse
 import time
+import pandas as pd
 import numpy as np
 from bitarray import bitarray
 from sys import builtin_module_names
@@ -14,6 +15,15 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 plt.rcParams.update({'font.size': 12})
 import matplotlib.colors as colors
+import dash
+import plotly.express as px
+import plotly.graph_objects as go
+import dash_core_components as dcc
+import dash_html_components as html
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 
 ########################################
 
@@ -37,9 +47,9 @@ def main():
     parser.add_argument('-a'  , '--auxiliar', help='Auxiliar File')
     args = parser.parse_args()
 
-    plt.ion()
-    plt.show()
-    fig=plt.figure()
+    # plt.ion()
+    # plt.show()
+    # fig=plt.figure()
 
     fb=open(args.file,'rb')
 
@@ -91,15 +101,17 @@ def main():
                 first_time=last_time=data[1]+data[2]/1e6
                 i+=1
             lastf=data[4]
-           
+
     nf=(int)((f2-f1)/fStep)
     frq=np.arange(f1,f2,fStep)
+    frq=np.arange(f1,2483,fStep)
     print(f1,f2)
     ####
 
     print("Start! {}, {}".format(Rlen,nPow))
 
     avgpow=np.array([])
+    maximuns=np.array([])
     
     fb.seek(lines*Rlen)
     try:
@@ -129,9 +141,7 @@ def main():
                     if any(np.isinf(e)):
                         e[:] = [x if not np.isinf(x) else -90 for x in e]
                         if any(np.isnan(e)):
-                            print(e)
                             e[:] = [x if not np.isnan(x) else -90 for x in e]
-                            print(e)
                     sfA[index] = e
                 sample_number +=1
                 if args.auxiliar:
@@ -149,8 +159,9 @@ def main():
                             print("Timestamp: ",timestamp)
                             print("Line: ",datetime.fromtimestamp(times))
 		        # Change between mean or max to see results
-                avgpow = np.append(avgpow,np.max(sfA))
-                #sfA = np.where(sfA > -45, 1, 0) 
+                avgpow = np.append(avgpow,np.mean(sfA))
+                maximuns = np.append(avgpow,np.max(sfA))
+                #sfA = np.where(sfA > -55, 1, 0) 
                 S=np.vstack((sfA,S))[:nt,:]  
                 sfA=np.zeros((1,nf))
                 n+=1
@@ -159,51 +170,73 @@ def main():
             fidx=((int)(data[3]/1e6)-f1)
             sfA[0,fidx:fidx+nPow]=data[5:]
             sfA[0,fidx:fidx+nPow]=np.maximum(sfA[0,fidx:fidx+nPow],data[5:])
-                            
-            if n%50==0:
-                plt.pcolormesh(frq,t,S,norm=colors.SymLogNorm(linthresh=0.03, linscale=0.03,vmin=-90, vmax=-50))
-                ax = plt.axes()
-                ax.set_ylabel('Samples')	
-                ax.set_xlabel('Frequency (MHz)')
-                plt.draw()
-                fig.canvas.flush_events()
-                plt.clf()
 
-        print(beginings)
-        avgpow = avgpow[5:]
+        # print(beginings)
         max_seconds = len(avgpow)/81
-        k = np.mean(avgpow)
-        print("k:",k)
-        picos = [x for x in avgpow if x > 0.5*k ] # all the values higher than the mean (k)
-        x = np.mean(picos) # mean of the higher values
-        print("x:",x)
-        thr = (k+x)/2
+        avgpow = avgpow[5:]
+        maximuns = maximuns[5:]
+        mean_maximuns = np.mean(maximuns)
+        print("mean_maximuns:", mean_maximuns)
+        picos = [x for x in maximuns if x >= 0.95*mean_maximuns ] # all the values higher than the mean (k)
+        #print(picos)
+        thr = np.mean(picos) # mean of the higher values
         print('Threshold: ', thr)
-        ymin = np.min(avgpow)
-        ymax = np.max(avgpow)
-        print("Minimo:",ymin)
-        print("Maximo:",ymax)
-        plt.figure(2, figsize=(10, 8), dpi= 80, facecolor='w', edgecolor='k')
-        ax = plt.axes()
+        # ymin = thr
+        # #ymin = np.min(avgpow)
+        # ymax = np.max(avgpow)
+        # print("Minimo:",ymin)
+        # print("Maximo:",ymax)
+        # plt.figure(2, figsize=(10, 8), dpi= 80, facecolor='w', edgecolor='k')
+        # ax = plt.axes()
         
-        ax.set_xlabel('time (s)')	
-        ax.set_ylabel('RSSI (dBm)')
+        # ax.set_xlabel('Time (seconds)')	
+        # ax.set_ylabel('RSSI (dBm)')
 
         timeSet = np.arange(0,max_seconds, max_seconds/len(avgpow))
         
-        plt.plot(timeSet, avgpow, 'o', label='Sweep average (RSSI value)')
+        # plt.plot(timeSet, avgpow, 'o', label='Activity')
         
-        plt.xlim([0, int(np.max(timeSet))])
+        # plt.xlim([0, int(np.max(timeSet))])
         if args.auxiliar:
-            for x in range(len(beginings)):
-                plt.axvline(x=beginings[x], color='r')  
+            print("Len(Beginnings): ", len(beginings))
+            for i in beginings:
+                plt.axvline(x=i, color='g', linestyle='-')  
         #####horizontal line
-        plt.axhline(y=thr, color='r', linestyle='--', label='Threshold')
-        plt.legend(loc="upper left")
-        plt.ylim([ymin,ymax])
-        plt.ylim([-73,-20])
-        plt.show()
-        waitforEnter()
+        # #plt.axhline(y=thr, color='r', linestyle='--', label='Threshold')
+        # plt.legend(loc="upper left")
+        # plt.title("Clean")
+        # #plt.ylim([ymin,ymax])
+        # plt.ylim([-75,-50])
+        # #plt.ylim([-65,-20])
+        # plt.show()
+        # waitforEnter()
+
+        data = {'Time':timeSet,'RSSI':avgpow}
+        df = pd.DataFrame(data=data)
+        fig = px.scatter(df, x="Time", y="RSSI", labels={"Time" : "Time (seconds)"})
+        fig.update_yaxes(range=[-70,-40], dtick=2, row=1, col=1)
+        fig.update_layout(
+                font_family="Courier New",
+                font_size=15,
+                title={
+                    'text': "Clean data",
+                    'y':0.95,
+                    'x':0.5,
+                    'xanchor': 'center',
+                    'yanchor': 'top'}
+                )
+
+        app.layout = html.Div(children=[
+
+            dcc.Graph(
+                id='example-graph',
+                figure=fig
+            )
+        ])
+
+        if __name__ == '__main__':
+            app.run_server(debug=True, port=8051)
+
 
     except KeyboardInterrupt:
         print(">>> Interrupt received, stopping...")

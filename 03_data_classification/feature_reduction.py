@@ -1,39 +1,47 @@
 import os
 import sys
 import math
-import time
 import copy
-import pandas
+import time
+import heapq
 import struct
 import random
-import pickle
 import argparse
-import warnings
 import scipy.stats
 import numpy as np
-import scipy.signal
 import pandas as pd
 from sklearn import svm
-from sklearn import tree
-from matplotlib import pyplot
+import dash
+import plotly.express as px
+import plotly.graph_objects as go
+import dash_core_components as dcc
+import dash_html_components as html
+from plotly.subplots import make_subplots
+import plotly.graph_objects as go
+from sklearn.neighbors import LocalOutlierFactor
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
-from mpl_toolkits.mplot3d import Axes3D
 from sklearn.model_selection import KFold
-from sklearn.neighbors import KernelDensity
-from sklearn.metrics import confusion_matrix
-from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import IsolationForest
-from sklearn.neighbors import KernelDensity
-from sklearn.neighbors import LocalOutlierFactor
-from sklearn.covariance import EllipticEnvelope
-from sklearn.mixture import GaussianMixture
-from sklearn.metrics import confusion_matrix
-from pandas.plotting import autocorrelation_plot
-from sklearn.linear_model  import LogisticRegression 
+from sklearn.feature_selection import f_classif
+# The idea behind StandardScaler is that it will transform your data such 
+# that its distribution will have a mean value 0 and standard deviation of 1.
+# In case of multivariate data, this is done feature-wise (in other words 
+# independently for each column of the data). Given the distribution of the data, 
+# each value in the dataset will have the mean value subtracted, and then divided 
+# by the standard deviation of the whole dataset (or feature in the multivariate case).
+from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import ExtraTreesClassifier
-
-warnings.filterwarnings("ignore")
+from sklearn.feature_selection import SelectKBest
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, classification_report
+from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 
 class color:
    PURPLE = '\033[95m'
@@ -47,11 +55,30 @@ class color:
    UNDERLINE = '\033[4m'
    END = '\033[0m'
 
+
+'''
+    Calculate the mean confidance with a confidance interval of 95%
+'''
+def mean_confidence_interval(data, alpha=5.0):
+    median = np.median(data)
+    # calculate lower percentile (e.g. 2.5)
+    lower_p = alpha / 2.0
+    # retrieve observation at lower percentile
+    lower = max(0.0, np.percentile(data, lower_p))
+    # calculate upper percentile (e.g. 97.5)
+    upper_p = (100 - alpha) + (alpha / 2.0)
+    # retrieve observation at upper percentile
+    upper = np.percentile(data, upper_p)
+
+    interval = median - lower
+
+    return median, lower, upper, interval
+
 '''
     Select the features that maximize the F1-Score using the Extra Tree Classifier. 
     The features that maximize the result have been previously calculated.
 '''
-def featuresToKeep(data):
+def featuresToKeep(data, components):
     
     features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_activity_f', 'min_activity_f', \
             'percentil75_activity_f', 'percentil90_activity_f', 'percentil95_activity_f', 'percentil99_activity_f', \
@@ -97,9 +124,56 @@ def featuresToKeep(data):
         for index, tupl in enumerate(sort):
             classification_system[tupl[0]] += index
     
+    '''
+        At this moment we find the best features to model our problem, using the strategy of the points-based classification system.
+        We repeat the process n times. The n=10 was sufficient to features keep in the same position of the classification system.
+    '''
+
+    ######################################################################
+    ##################### Plot the feature importance ####################
+    ######################################################################
+
+    # z = [y for x,y in classification_system.items()]
+    # x = [x for x,y in classification_system.items()]
+    # ind = np.arange(len(z))
+    # fig = make_subplots(rows=1, cols=1)
+    # fig.add_trace(go.Bar(
+    #                         x = x, 
+    #                         y = z,
+    #                     ),
+    #                     row=1, col=1) 
+    # fig.update_traces(texttemplate='%{y:.2s}', textposition='outside')
+    # fig.update_layout(
+    #     xaxis_title="Features",
+    #     yaxis_title="Points",
+    #     xaxis_tickangle=-45,
+    #     font_family="Courier New",
+    #     title={
+    #         'text': "Points-based Classification System",
+    #         'y':0.95,
+    #         'x':0.5,
+    #         'xanchor': 'center',
+    #         'yanchor': 'top'},
+    #     autosize = False,
+    #     width= 1700,
+    #     height= 800
+    #     )
+
+    # app.layout = html.Div(children=[
+
+    #     dcc.Graph(
+    #         id='example-graph',
+    #         figure=fig
+    #     )
+
+    # ])
+
+    # if __name__ == '__main__':
+    #     app.run_server(debug=False, port=8055)
+
     classification_system = dict(sorted(classification_system.items(), key=lambda x: x[1]))
 
-    featuresKeeped = [ feature for index, feature in enumerate(classification_system.keys()) if index < 20]
+    featuresKeeped = [ feature for index, feature in enumerate(classification_system.keys()) if index < components]
     result = {}
 
     for index, feature in enumerate(features):
@@ -108,33 +182,15 @@ def featuresToKeep(data):
     
     return result
 
-'''
-    Calculate the mean confidance with a confidance interval of 95%
-'''
-def mean_confidence_interval(data, alpha=5.0):
-    median = np.median(data)
-    # calculate lower percentile (e.g. 2.5)
-    lower_p = alpha / 2.0
-    # retrieve observation at lower percentile
-    lower = max(0.0, np.percentile(data, lower_p))
-    # calculate upper percentile (e.g. 97.5)
-    upper_p = (100 - alpha) + (alpha / 2.0)
-    # retrieve observation at upper percentile
-    upper = np.percentile(data, upper_p)
-
-    interval = median - lower
-
-    return median, lower, upper, interval
-
-'''
-    Read a file to matrix
-'''
 def readFileToMatrix(files) :
     assert len(files) > 0
     
     matrix = []
     for f in files:
+
         fb = open(f, "rb")
+        filename = f.split('/')[-1].split("_")[0]
+
         try:
             while True:
                 # read each line of the file
@@ -145,15 +201,25 @@ def readFileToMatrix(files) :
                 
                 # unpack the record
                 line = list(struct.unpack('=53d',record))
-
-                # append the line to matrix
-                matrix.append(line)
+                
+                if ('anomaly' in filename and line[-1] == 1) or ('normal' in filename):    
+                    # append the line to matrix
+                    matrix.append(line)
     
         finally:
             fb.close()
 
     matrix = np.array(matrix)
     return matrix
+
+def combinations(gamma, kernel, nu, degree):
+    result = ( ["classifier.append(svm.OneClassSVM(gamma={}, nu={}, kernel='{}', degree={}))".format(g,n,k,d)]
+            for g in gamma
+            for k in kernel
+            for n in nu
+            for d in degree)
+
+    return [item for sublist in list(result) for item in sublist]
 
 '''
     Calculate the F1-Score 
@@ -170,7 +236,6 @@ def calc_score(anomaly_pred, regular_pred):
     recall = tp/(tp+fn)
     
     return 2 * ((precision * recall)/(precision + recall)) * 100
-
 
 '''
     Print the performance results 
@@ -200,7 +265,7 @@ def print_results(anomaly_pred, regular_pred):
     f1_score = 2 * ((precision * recall)/(precision + recall))
     print("Score: {:.2f}%".format(f1_score))
     print("Confusion matrix:")
-    print(pandas.DataFrame([[tp, fp], [fn, tn]], ["Pred Normal", "Pred Anomaly"], ["Actual Normal", "Actual Anomaly"]))
+    print(pd.DataFrame([[tp, fp], [fn, tn]], ["Pred Normal", "Pred Anomaly"], ["Actual Normal", "Actual Anomaly"]))
     print("----------------------------------------------------------")
 
     return f1_score, precision, nrAnomalies, nrClean, tp, fp, fn, tn
@@ -216,9 +281,10 @@ def remove_algorithms(score):
     values = []
 
     for i in range(0, len(score)):
-        if score[i] < median and (math.floor(score[i-1] - score[i]) >= step or median - score[i] > 2*step):
+        if score[i] < median and (math.floor(score[i-1] - score[i]) >= 4*step or median - score[i] > 6*step):
             values.append(score[i])
 
+    print([x for i, x in enumerate(remv) if x not in values])
     return [i for i, x in enumerate(remv) if x in values]
 
 '''
@@ -251,32 +317,32 @@ def predict(files, scaler, clf, pca, features):
     Y = np.array(Y).reshape(-1,1)
 
     data = scaler.transform(X)
-    data = pca.transform(data)
+    # data = pca.transform(data)
 
-    return clf.predict(data)
+    return clf.predict(data)    
 
 def choose_algorithm(argument): 
+    gamma = [0.001, 0.01, "\'auto\'"]
+    kernel = ['poly', 'linear', 'rbf']
+    nu = [0.001, 0.01, 0.5 ]
+    degree = [3]
+
+    classifier = []
+    for cl in combinations(gamma, kernel, nu, degree):
+            exec(cl)
+
+    classifier = classifier + [ svm.OneClassSVM(kernel='linear'),
+                                svm.OneClassSVM(gamma=0.01, kernel='linear', nu=0.001),
+                                svm.OneClassSVM(gamma=0.001, kernel='linear', nu=0.001),
+                                svm.OneClassSVM(gamma=0.01, kernel='poly', nu=0.01),
+                                svm.OneClassSVM(degree=1, gamma='auto', kernel='poly'),
+                                svm.OneClassSVM(gamma=0.001, nu=0.001),
+                                svm.OneClassSVM(gamma=0.001, nu=0.01),
+                                svm.OneClassSVM(gamma=0.01, kernel='sigmoid', nu=0.01),
+                                svm.OneClassSVM(gamma=0.01, kernel='sigmoid', nu=0.001)
+                            ]
     algorithms = { 
-        "SVM": [  
-                svm.OneClassSVM(gamma=0.001, kernel='linear', nu=0.001),
-                svm.OneClassSVM(gamma=0.01, kernel='poly', nu=0.01),
-                svm.OneClassSVM(degree=1, gamma='auto', kernel='poly'),
-                svm.OneClassSVM(gamma=0.001, nu=0.001),
-                svm.OneClassSVM(gamma=0.001, nu=0.01),
-                svm.OneClassSVM(gamma=0.01, kernel='sigmoid', nu=0.01),
-                svm.OneClassSVM(gamma=0.01, kernel='sigmoid', nu=0.001)
-            ],
-        "IF": [
-                IsolationForest(max_samples=1),
-                IsolationForest(max_samples=4999),
-                IsolationForest(contamination=0.1),
-                IsolationForest(contamination=0.2)
-            ], 
-        "LOF": [
-                LocalOutlierFactor(n_neighbors=500, novelty=True, contamination=0.1),
-                LocalOutlierFactor(n_neighbors=5000, novelty=True, contamination=0.1),
-                LocalOutlierFactor(n_neighbors=5000, novelty=True, contamination=0.2)
-            ] 
+        "SVM": classifier
     } 
   
     # get() method of dictionary data type returns  
@@ -285,6 +351,7 @@ def choose_algorithm(argument):
     # be assigned as default value of passed argument 
     return algorithms.get(argument, "SVM") 
 
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -292,17 +359,15 @@ def main():
     parser.add_argument("-f", "--files", nargs='+')
     # Read from an directory
     parser.add_argument("-d", "--directory", nargs='+')
+    # Read from files
+    parser.add_argument("-c", "--comp", type=int, required=True)
     # Wildcard to detect what is normal
     parser.add_argument("-w", "--wildcard", required=True)
-    # Type of anomaly
-    parser.add_argument("-a", "--anomaly")
-    # Wants to export files
-    parser.add_argument("-e","--export",  action='store_true')
-    # Wants to export files
-    parser.add_argument("-alg","--algorithm", required=True)  
     # Print confusion matrix for each algorithm
-    parser.add_argument("-v","--verbose",  action='store_true')  
+    parser.add_argument("-v","--verbose",  action='store_true')              
     args=parser.parse_args()
+
+    comp = args.comp
 
     # Check if we have arguments to work on
     if not args.files:
@@ -310,15 +375,17 @@ def main():
     elif not (args.files or args.directory):
         parser.error("No files given, add --files or --directory.")
 
-    # Inicialize the variables
     
+    ## Inicialize the variables
+
     clean_files = []
     anomaly_files = []
     
-    CV_train = []
+    CV_train_clean = []
+    CV_train_anomaly = []
     CV_test_normal = []
     CV_test_anomaly = []
-    
+
     kfold_splits = 6
     kf = KFold(n_splits=kfold_splits)
 
@@ -342,52 +409,47 @@ def main():
                     if ".dat" in file:
                         args.files.append(os.path.join(r, file))
 
-    
     # Read files and keep only the features selected
-    features = featuresToKeep(readFileToMatrix(args.files))
+    features = featuresToKeep(readFileToMatrix(args.files), args.comp)
 
-    
     # Divide filenames in normal or anomaly depending on the wildcard
     for f in args.files:
         if args.wildcard in f:
             clean_files.append(f)  
-        elif args.anomaly in f:
+        else:
             anomaly_files.append(f)
 
     
     clean_files = np.array(clean_files)
     anomaly_files = np.array(anomaly_files)
-    
-    # print("\nClean Files: ", clean_files, sep='\n')
-    # print("\nAnomaly Files: ", anomaly_files, sep='\n')
 
-    
     # Split Clean and Anomalous files into train and test datasets
     for clean, anomaly in zip(kf.split(clean_files), kf.split(anomaly_files)):
         train_index_clean, test_index_clean = clean
         train_index_anomaly, test_index_anomaly = anomaly
 
-        
-        CV_train.append(train_index_clean)
-        CV_test_normal.append(test_index_clean) 
+        CV_train_clean.append(train_index_clean)
+        CV_train_anomaly.append(train_index_anomaly)
 
+        CV_test_normal.append(test_index_clean) 
         CV_test_anomaly.append(test_index_anomaly)     
  
     # Test each algorithm for each k-Fold Split
-    for kfold_index, values in enumerate(zip(CV_train, CV_test_normal, CV_test_anomaly)):
-        train, testN, testA = values
+    for kfold_index, values in enumerate(zip(CV_train_clean, CV_train_anomaly, CV_test_normal, CV_test_anomaly)):
+        train_N, train_A, testN, testA = values
         print("\nFILE INDEXES")
-        print("TRAIN:",train,"TEST NORMAL:", testN, "TESTE ANOMALY:", testA)
+        print("TRAIN CLEAN:",train_N ,"TRAIN ANOMALY:", train_A ,"TEST NORMAL:", testN , "TESTE ANOMALY:", testA)
 
         # Select the files to each group
-        cv_train = clean_files[train]
+        cv_train_normal = clean_files[train_N]
+        cv_train_anomaly = anomaly_files[train_A]
         cv_test_normal = clean_files[testN]
         cv_test_anomaly = anomaly_files[testA]
         print("\nAnomaly Files:\n",*cv_test_anomaly, sep="\n")
         print("\nClean Files:\n",*cv_test_normal, sep="\n")
-
+        
         # Read file into a DataFrame
-        train_data = pd.DataFrame(data=readFileToMatrix(cv_train))
+        train_data = pd.DataFrame(data=readFileToMatrix(np.concatenate((cv_train_normal, cv_train_anomaly))))
         # Select the columns corresponding to the selected features
         train_data = train_data.iloc[:,list(features.keys()) + [-1] ]
         # To each column assign the feature name
@@ -397,7 +459,6 @@ def main():
         Y = train_data['target']
         X = train_data.drop('target', axis=1)
 
-
         # Standarize the values of the train data
         scaler = StandardScaler()
 
@@ -406,12 +467,12 @@ def main():
         
         # Apply PCA to feature reduction        
         pca = PCA(n_components=5)
-        X = pca.fit_transform(X)
+        # X = pca.fit_transform(X)
         
         score = []
         flag = True
         start = time.time()
-        for cl in choose_algorithm(args.algorithm):
+        for cl in choose_algorithm("SVM"):
             
             print("\n",color.BOLD+"Classificador:"+color.END,cl)
                     
@@ -422,6 +483,7 @@ def main():
             anom_data = predict( cv_test_anomaly, scaler, cl, pca, features ).reshape(-1,1)
 
             calc = calc_score(anom_data, regu_data)
+            print("Calc:", calc)
 
             if not np.isnan(calc):
             
@@ -440,6 +502,7 @@ def main():
             if args.verbose:
                 print_results(predict(cv_test_anomaly, scaler, cl, pca, features ), predict(cv_test_normal, scaler, cl, pca, features ))  
 
+
         # Check what models were ignored
         ignore = remove_algorithms(score)
         print("\nIgnored Algorithms:", ignore)
@@ -456,7 +519,7 @@ def main():
                                     "NrAnomalies" : nrAnomalies,
                                         "NrClean" : nrClean,
                                            "Time" : time.time() - start 
-                                        } 
+                                        }
 
     print("\n",results)
 
@@ -474,6 +537,46 @@ def main():
 
     print(color.BOLD+"\nConfusion matrix:"+color.END)
     print(pd.DataFrame([[ int(float(meanResultsWithIntervals.loc['TP']['Mean'])), int(float(meanResultsWithIntervals.loc['FP']['Mean'])) ], [ int(float(meanResultsWithIntervals.loc['FN']['Mean'])) , int(float(meanResultsWithIntervals.loc['TN']['Mean'])) ]], ["Actual Normal", "Actual Anomaly"], ["Predicted Normal", "Predicted Anomaly"]))
-    
+  
+
+    ######################################################################
+    ######### Plot F1-Score depending the number of Features #############
+    ######################################################################  
+
+    # fig = make_subplots(rows=1, cols=1)
+    # fig.add_trace(go.Bar(
+    #                         x = [ x for x,y in f1Score.items()], 
+    #                         y = [ y for x,y in f1Score.items()]
+    #                     ),
+    #                     row=1, col=1) 
+    # fig.update_traces(texttemplate='%{y:.2s}%', textposition='outside')
+    # fig.update_yaxes(range=[0,100], dtick=5, row=1, col=1)
+    # fig.update_layout(
+    #     font_family="Courier New",
+    #     font_size=15,
+    #     title={
+    #         'text': "F1-Score using ETC",
+    #         'y':0.95,
+    #         'x':0.5,
+    #         'xanchor': 'center',
+    #         'yanchor': 'top'},
+    #     autosize = False,
+    #     width= 1700,
+    #     height= 800
+    #     )
+
+    # app.layout = html.Div(children=[
+
+    #     dcc.Graph(
+    #         id='example-graph',
+    #         figure=fig
+    #     )
+
+    # ])
+
+    # if __name__ == '__main__':
+    #     app.run_server(debug=False, port=8051)
+
+
 if __name__ == '__main__':
 	main()

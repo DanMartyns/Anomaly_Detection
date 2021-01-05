@@ -29,7 +29,7 @@ recursiveDir(){
                 echo "Warning: $filename.dat found $file_count times in $dir!"
             else
                 echo "The directory $dir not contain $filename.dat"
-                if [[ $filename == *"vazio"* ]];
+                if [[ $filename == *"anomaly"* ]];
                 then
                     echo "Input File: "$f
                     txt=$(find ../00_data_extraction/$dir -iname '*.txt')
@@ -39,7 +39,9 @@ recursiveDir(){
                     echo "Input File: "$f
                     python3 hackrfreadbinfile.py -f $f 
                 fi
-                mv $(pwd)/data/$filename.dat $(pwd)/$dir
+                echo "Group Samples"
+                python3 agroup.py -f $(pwd)/data/$filename.dat -s 30
+                mv $(pwd)/data/32_15/$filename.dat $(pwd)/$dir
             fi
         fi
     done
