@@ -69,33 +69,44 @@ def group_list(lista):
 
 
 def group_array(lista):
-    added = False
-    l = []
+    result = []
+    r = 0
     for value in lista:
-        if l == [] and value == 1:
-            l.append(value)
-            added = True
+        if value == 1: r += 1
         else:
-            if value == 1:
-                if not added: 
-                    l.append(value)
-                    added = True 
-                else:
-                    l[-1] += value
-            elif value == 0:
-                added = False
+            if r != 0:
+                result.append(r)
+                r = 0
 
-    if l != []:
-        return [round(x,3) for x in l]
-    else:
-        return [0]
+    return result if result != [] else [0]
 
-def window_analysis(observation_window, threshold, window_number):
+def window_analysis(observation_window, threshold, window_number, sec):
     global last_EMA_f
     global last_EMA_fc
     global last_max_f
     global last_max_fc
+
+    # ob = np.zeros(shape=(1,84))
+    # result = []
+    # sample = 0
+    # for value in observation_window[:,2:-1]:
+    #     if sample < 81:
+    #         if sample == 0:
+    #             ob = np.array(value)
+    #         else:
+    #             ob = np.vstack((ob,value))
+    #             # print("Ob:", len(ob))
+    #         sample += 1
+    #     else:
+    #         result.append(ob)
+    #         ob = np.zeros(shape=(1,84))
+    #         sample = 0
     
+    # final = []
+    # for value in np.array(result):
+    #     final.append(np.mean(value, axis=0))
+    
+    # print("Final:",final)
     ######################################################################################
     ################## Apply the threshold and transcribe to 0s and 1s ###################
     ######################################################################################
@@ -108,6 +119,8 @@ def window_analysis(observation_window, threshold, window_number):
     
     observation_window[:,2:-1] = vfunc(observation_window[:,2:-1], threshold)
     mean_samples = vfunc(mean_samples, threshold)
+    # print(observation_window)
+    # print(mean_samples)
 
     ######################################################################################
     ################################# Frequency/time #####################################
@@ -258,55 +271,55 @@ def window_analysis(observation_window, threshold, window_number):
     ################################# Activity over time #################################
     ######################################################################################
     
-    # print("Activity:",mean_samples)
     activity = np.array(mean_samples)
+    # print("Activity:", activity.shape)
     silence = 1 - activity
-    # print("Silence:",silence)
-    
+    # print("Silence:", silence.sum(axis=0))
+
+
     activity = group_array(activity)
     # print(activity)
     silence = group_array(silence)
-
     # print(silence)
 
     # Mean Activity
-    mean_activity_t = np.mean(activity)
+    mean_activity_t = np.mean(activity) * sec
     # Median Activity
-    median_activity_t = np.median(activity)
+    median_activity_t = np.median(activity) * sec
     # Standard deviation Activity
-    std_activity_t = np.std(activity)
+    std_activity_t = np.std(activity) * sec
 
     # Percentil 75 activity
-    percentil75_activity_t = np.percentile(activity,75)
+    percentil75_activity_t = np.percentile(activity,75) * sec
     # Percentil 90 activity
-    percentil90_activity_t = np.percentile(activity,90)
+    percentil90_activity_t = np.percentile(activity,90) * sec
     # Percentil 95 activity
-    percentil95_activity_t = np.percentile(activity,95)
+    percentil95_activity_t = np.percentile(activity,95) * sec
     # Percentil 99 activity
-    percentil99_activity_t = np.percentile(activity,99)
+    percentil99_activity_t = np.percentile(activity,99) * sec
     # Min Activity
-    min_activity_t = np.min(activity)
+    min_activity_t = np.min(activity) * sec
     # Max Activity
-    max_activity_t = np.max(activity)
+    max_activity_t = np.max(activity) * sec
 
     # Mean Silence
-    mean_silence_t = np.mean(silence)
+    mean_silence_t = np.mean(silence) * sec
     # Median Silence
-    median_silence_t = np.median(silence)
+    median_silence_t = np.median(silence) * sec
     # Standard deviation Silence
     std_silence_t = np.std(silence)
     # Percentil 75 silence
-    percentil75_silence_t = np.percentile(silence,75)
+    percentil75_silence_t = np.percentile(silence,75) * sec
     # Percentil 90 silence
-    percentil90_silence_t = np.percentile(silence,90)
+    percentil90_silence_t = np.percentile(silence,90) * sec
     # Percentil 95 silence
-    percentil95_silence_t = np.percentile(silence,95)
+    percentil95_silence_t = np.percentile(silence,95) * sec
     # Percentil 99 silence
-    percentil99_silence_t = np.percentile(silence,99)
+    percentil99_silence_t = np.percentile(silence,99) * sec
     # Min silence
-    min_silence_t = np.min(silence)
+    min_silence_t = np.min(silence) * sec
     # Max silence
-    max_silence_t = np.max(silence)
+    max_silence_t = np.max(silence) * sec
 
     target = np.max(observation_window[:, -1])
 
@@ -330,12 +343,16 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
     # open the file
     fb=open(file,'rb')
 
+    # window_size = math.ceil(window_size/1) if '1sec' in file else (math.ceil(window_size/5) if '5sec' in file else ( math.ceil(window_size/10) if '10sec' in file else math.ceil(window_size/30) ))
+    # window_offset = math.ceil(window_offset/1) if '1sec' in file else (math.ceil(window_offset/5) if '5sec' in file else ( math.ceil(window_offset/10) if '10sec' in file else math.ceil(window_offset/30) ))
     # print("File size:", os.stat(file).st_size)
     
     # initialization of the observation window
     observation_window = []
 
     result = []
+
+    sec = (1 if '1sec' in file else (5 if '5sec' in file else (10 if '10sec' in file else 30)))
 
     try:
         
@@ -354,10 +371,11 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
 
             # unpack the line
             line = list(struct.unpack('=87d',record))
-
+            # print(line)
+            
             # The observation window will have de size of window size
             if sample < window_size:
-
+                # if ('anomaly' in file and line[-1] == 1) or ('normal' in file):
                 observation_window.append(line)
                     
                 # increase the number of samples inside the window
@@ -373,11 +391,13 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
                 # number of samples for each observation window
                 sample = 0
 
+                # print(observation_window)
                 # analyse the window
                 # remove the first 3 measurements
                 if window_number >= 3:
-                    data = window_analysis(np.array(observation_window), threshold, window_number)
-                    data = [round(value,3) for value in data]
+                    data = window_analysis(np.array(observation_window), threshold, window_number, sec)
+                    data = [round(value,3) for value in data] + [sec]
+                    # print(data)
                     result.append(data)
                                
                 # reset the observation window
@@ -389,8 +409,7 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
     finally:
         fb.close()
 
-    df = pd.DataFrame(data=result)
-    df.columns = features + ['target'] 
+    df = pd.DataFrame(result, columns= features + ['target', 'aggregation'])
     return df
 def main() :
     
@@ -419,13 +438,15 @@ def main() :
     print("Files:",*files, sep='\n')
     
     # register the results in dataframes
-    
     frames = []
-    for f in files:    
-        data = readFile_processFeatures(f, math.ceil(args.windowSize), math.ceil(args.windowOffset), args.threshold)
+    for f in files[:5]:    
+        print("File:", f)
+        data = readFile_processFeatures(f, args.windowSize, args.windowOffset, args.threshold)
         frames.append(data)
+        print("Nr Registers in file:", len(data))
 
-    df = pd.concat(frames)
+    frames = pd.concat(frames)
+    print("Frames:",frames)
 
     function = ['mean', 'median', 'std', 'max', 'min', 'percentil75', 'percentil90', 'percentil95', 'percentil99']
     base_idea = ['f', 't']
@@ -434,17 +455,36 @@ def main() :
 
     combination = [(p[0]+'_activity_'+p[1], p[0]+'_silence_'+p[1]) for p in itertools.product(*l)]
 
-    print(df['mean_activity_t'])
     # DataFrame for each feature
     # row = time instant || column = file (each file represents the number of seconds the samples were grouped (1, 5, 10 and 30 seconds))
     dataframeForEachFeature = []
     for feature_index, feature in enumerate(combination):
         
         feature_activity, feature_silence = feature
-        
-        # "10 activity" : data[0], "10 silence" : data[1],  "5 activity" : data[2], "5 silence" : data[3],
-        d = pd.DataFrame(data = dict({ "1 activity" : df[feature_activity], "1 silence" : df[feature_silence] }))
-        dataframeForEachFeature.append(d)
+
+        activity_1  = list(frames[ frames['aggregation'] == 1 ][feature_activity])
+        silence_1   = list(frames[ frames['aggregation'] == 1 ][feature_silence]) 
+        activity_5  = list(frames[ frames['aggregation'] == 5 ][feature_activity]) 
+        silence_5   = list(frames[ frames['aggregation'] == 5 ][feature_silence])
+        activity_10 = list(frames[ frames['aggregation'] == 10 ][feature_activity]) 
+        silence_10  = list(frames[ frames['aggregation'] == 10 ][feature_silence])
+        activity_30 = list(frames[ frames['aggregation'] == 30 ][feature_activity]) 
+        silence_30  = list(frames[ frames['aggregation'] == 30 ][feature_silence])
+
+        maximum = max(len(activity_1),len(silence_1), len(activity_5), len(silence_5), len(activity_10), len(silence_10), len(activity_30), len(silence_30))  
+
+        dados = pd.DataFrame(data = dict({ 
+                                    "1 activity"  : activity_1  + [np.nan]* (maximum - len(activity_1)),
+                                    "1 silence"   : silence_1   + [np.nan]* (maximum - len(silence_1)), 
+                                    "5 activity"  : activity_5  + [np.nan]* (maximum - len(activity_5)),
+                                    "5 silence"   : silence_5   + [np.nan]* (maximum - len(silence_5)),    
+                                    "10 activity" : activity_10 + [np.nan]* (maximum - len(activity_10)), 
+                                    "10 silence"  : silence_10  + [np.nan]* (maximum - len(silence_10)),  
+                                    "30 activity" : activity_30 + [np.nan]* (maximum - len(activity_30)),  
+                                    "30 silence"  : silence_30  + [np.nan]* (maximum - len(silence_30))                                                                                                      
+                                }))
+        print(dados)                      
+        dataframeForEachFeature.append(dados)
     
     # Inicialize variables
     updateMenus = []
@@ -453,24 +493,22 @@ def main() :
     # add traces
     for feature, frame in zip(combination, dataframeForEachFeature):
         print(feature,'\n',frame)
-        for sec, col in zip([1],range(0,len(frame.columns)-1, 2)):
+        for sec, col in zip([1,5,10,30],range(0,len(frame.columns)-1, 2)):
             data.append(go.Scatter(x = frame.iloc[:,col], y = frame.iloc[:, col+1], mode="markers", name=feature[0].replace("_activity", "")+"_"+str(sec)+"sec"))
 
-    # print("Data:",*data)
-
     for feature_index, feature in enumerate(combination):
-        print(feature_index, feature)
         updateMenus.append(
             dict(
                 {
                     'label': feature[0].replace("_activity", ""),
                     'method': 'update',
                     'args': [
-                        {'visible': [False]*feature_index*1 + [True, True, True] + [False]*((len(combination) - feature_index)*1 ) }
+                        {'visible': [False]*feature_index*4 + [True]*4 + [False]*((len(combination) - feature_index)*4 ) }
                     ]
                 }  
             )
         )
+    # print(updateMenus)
 
     # update layout with buttons, and show the figure
     layout=go.Layout(title = 'Results of each feature',

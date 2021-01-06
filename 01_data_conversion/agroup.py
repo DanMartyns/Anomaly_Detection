@@ -11,6 +11,7 @@ import dash
 import dash_core_components as dcc
 import dash_html_components as html
 import plotly.express as plx
+import functools 
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
@@ -33,11 +34,13 @@ def main() :
 
     start = time.time()
 
-    sample_sec = np.empty(shape=(0,85))
     maximuns = []
     mean = []
-    n=0
+    
     try:
+        n_sample = 0
+        sampling_window = 0
+        sample_sec = np.empty(shape=(0,85))
 
         while True:
             # read each line of the file
@@ -50,21 +53,25 @@ def main() :
             line = np.array(list(struct.unpack('=87d',record)))
 
             
-            if sample_sec.shape[0] <= int(args.seconds)*82:
+            if n_sample <= int(args.seconds)*81:
                 sample_sec = np.vstack((sample_sec, line[2:]))
+                n_sample += 1
             else:
-                # if any(x==1 for x in sample_sec[-1]):
-                #     target = 1
-                # else:
-                #     target = 0
-                sample_sec = np.mean(sample_sec, axis=0)
-                result = np.concatenate(([n, line[1]], sample_sec))
-                #result = np.concatenate((result, [target]))
+                target = max(sample_sec[:,-1])
+                s = np.mean(sample_sec[:,:-1], axis=0)
+                result = np.concatenate(([ sampling_window, line[1]], s))
+                result = np.concatenate((result, [target]))
                 w.write(result)
-                mean.append(np.mean(sample_sec))
-                maximuns.append(max(sample_sec))
+
+                # See the results
+                mean.append(np.mean(s))
+                maximuns.append(max(s))
+
+                # Reset Variables
                 sample_sec = np.empty((0,85))
-                n += 1
+                sampling_window += 1
+                n_sample = 0
+
 
         mean_maximuns = np.mean(maximuns[1:])
         picos = [x for x in maximuns if x >= 0.99*mean_maximuns ] # all the values higher than the mean (k)
@@ -72,8 +79,8 @@ def main() :
         # print("Threshold:",thr)
 
         if args.plot:
-            fig = px.scatter(x=np.arange(0,len(mean[1:])), y=mean[1:], width=800, height=800)     
-            fig.update_yaxes(range=[-80,-10])
+            fig = px.scatter(x=np.arange(0,len(mean[1:])), y=mean[1:], width=1200, height=800)     
+            # fig.update_yaxes(range=[-80,-10])
             fig.update_layout(
                 title="Spectrum activity ("+args.seconds+" second aggregation) ",
                 xaxis_title="Time (seconds)",
