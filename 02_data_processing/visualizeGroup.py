@@ -80,45 +80,24 @@ def group_array(lista):
 
     return result if result != [] else [0]
 
-def window_analysis(observation_window, threshold, window_number, sec):
+def window_analysis(observation_window, threshold, window_number):
     global last_EMA_f
     global last_EMA_fc
     global last_max_f
     global last_max_fc
 
-    # ob = np.zeros(shape=(1,84))
-    # result = []
-    # sample = 0
-    # for value in observation_window[:,2:-1]:
-    #     if sample < 81:
-    #         if sample == 0:
-    #             ob = np.array(value)
-    #         else:
-    #             ob = np.vstack((ob,value))
-    #             # print("Ob:", len(ob))
-    #         sample += 1
-    #     else:
-    #         result.append(ob)
-    #         ob = np.zeros(shape=(1,84))
-    #         sample = 0
-    
-    # final = []
-    # for value in np.array(result):
-    #     final.append(np.mean(value, axis=0))
-    
-    # print("Final:",final)
     ######################################################################################
     ################## Apply the threshold and transcribe to 0s and 1s ###################
     ######################################################################################
-    mean_samples = []
-    for i in observation_window[:,2:-1]:
-        mean_samples.append(np.mean(i))
+    # mean_samples = []
+    # for i in observation_window[:,2:-1]:
+    #     mean_samples.append(np.mean(i))
     
     function = lambda x, threshold: 1 if x >= threshold else 0
     vfunc = np.vectorize(function)
     
     observation_window[:,2:-1] = vfunc(observation_window[:,2:-1], threshold)
-    mean_samples = vfunc(mean_samples, threshold)
+    # mean_samples = vfunc(mean_samples, threshold)
     # print(observation_window)
     # print(mean_samples)
 
@@ -127,12 +106,17 @@ def window_analysis(observation_window, threshold, window_number, sec):
     ######################################################################################
 
     activity = observation_window[:,2:-1]
+    # for x,y in zip(activity.sum(axis=1), observation_window[:,-1]):
+    #     print(x, y)
     silence = 1-activity
+    # for x in silence.sum(axis=1):
+    #     print(x)
 
     ## Acitivity/Silence Features
 
     # Sum by lines
     sum_by_lines_a = activity.sum(axis=1)
+    # print("Média:", np.mean(sum_by_lines_a))
 
     # Mean Activity
     mean_activity = np.mean(sum_by_lines_a)
@@ -271,10 +255,12 @@ def window_analysis(observation_window, threshold, window_number, sec):
     ################################# Activity over time #################################
     ######################################################################################
     
-    activity = np.array(mean_samples)
-    # print("Activity:", activity.shape)
+    # Noise activates 2 frequencies, so it will be considered a moment of activity if an instant of time has more than two active frequencies
+    function = lambda x: 1 if x > 2 else 0
+    vfunc = np.vectorize(function)
+    activity = vfunc(activity.sum(axis=1))
     silence = 1 - activity
-    # print("Silence:", silence.sum(axis=0))
+    # print("Silence:", silence)
 
 
     activity = group_array(activity)
@@ -283,43 +269,43 @@ def window_analysis(observation_window, threshold, window_number, sec):
     # print(silence)
 
     # Mean Activity
-    mean_activity_t = np.mean(activity) * sec
+    mean_activity_t = np.mean(activity) 
     # Median Activity
-    median_activity_t = np.median(activity) * sec
+    median_activity_t = np.median(activity)
     # Standard deviation Activity
-    std_activity_t = np.std(activity) * sec
+    std_activity_t = np.std(activity)
 
     # Percentil 75 activity
-    percentil75_activity_t = np.percentile(activity,75) * sec
+    percentil75_activity_t = np.percentile(activity,75)
     # Percentil 90 activity
-    percentil90_activity_t = np.percentile(activity,90) * sec
+    percentil90_activity_t = np.percentile(activity,90)
     # Percentil 95 activity
-    percentil95_activity_t = np.percentile(activity,95) * sec
+    percentil95_activity_t = np.percentile(activity,95)
     # Percentil 99 activity
-    percentil99_activity_t = np.percentile(activity,99) * sec
+    percentil99_activity_t = np.percentile(activity,99)
     # Min Activity
-    min_activity_t = np.min(activity) * sec
+    min_activity_t = np.min(activity)
     # Max Activity
-    max_activity_t = np.max(activity) * sec
+    max_activity_t = np.max(activity)
 
     # Mean Silence
-    mean_silence_t = np.mean(silence) * sec
+    mean_silence_t = np.mean(silence)
     # Median Silence
-    median_silence_t = np.median(silence) * sec
+    median_silence_t = np.median(silence)
     # Standard deviation Silence
     std_silence_t = np.std(silence)
     # Percentil 75 silence
-    percentil75_silence_t = np.percentile(silence,75) * sec
+    percentil75_silence_t = np.percentile(silence,75)
     # Percentil 90 silence
-    percentil90_silence_t = np.percentile(silence,90) * sec
+    percentil90_silence_t = np.percentile(silence,90)
     # Percentil 95 silence
-    percentil95_silence_t = np.percentile(silence,95) * sec
+    percentil95_silence_t = np.percentile(silence,95)
     # Percentil 99 silence
-    percentil99_silence_t = np.percentile(silence,99) * sec
+    percentil99_silence_t = np.percentile(silence,99)
     # Min silence
-    min_silence_t = np.min(silence) * sec
+    min_silence_t = np.min(silence)
     # Max silence
-    max_silence_t = np.max(silence) * sec
+    max_silence_t = np.max(silence)
 
     target = np.max(observation_window[:, -1])
 
@@ -343,16 +329,16 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
     # open the file
     fb=open(file,'rb')
 
-    # window_size = math.ceil(window_size/1) if '1sec' in file else (math.ceil(window_size/5) if '5sec' in file else ( math.ceil(window_size/10) if '10sec' in file else math.ceil(window_size/30) ))
-    # window_offset = math.ceil(window_offset/1) if '1sec' in file else (math.ceil(window_offset/5) if '5sec' in file else ( math.ceil(window_offset/10) if '10sec' in file else math.ceil(window_offset/30) ))
-    # print("File size:", os.stat(file).st_size)
+    typeFile = ('normal' if 'normal' in file else 'anomaly')
+    print("Type of File:", typeFile)
+
+    print("Window Size:", window_size, "Window Offset:", window_offset)
+    print("File size:", os.stat(file).st_size)
     
     # initialization of the observation window
     observation_window = []
 
     result = []
-
-    sec = (1 if '1sec' in file else (5 if '5sec' in file else (10 if '10sec' in file else 30)))
 
     try:
         
@@ -361,6 +347,10 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
 
         # The initialization of the number of samples
         sample = 0
+
+        nr_anomalies = 0
+
+        nr_samples = 0
 
         while True:
             # read each line of the file
@@ -371,10 +361,14 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
 
             # unpack the line
             line = list(struct.unpack('=87d',record))
-            # print(line)
+            
+            nr_samples += 1
+            if line[-1] == 1:
+                nr_anomalies += 1
             
             # The observation window will have de size of window size
             if sample < window_size:
+                # print("Line:",line)
                 # if ('anomaly' in file and line[-1] == 1) or ('normal' in file):
                 observation_window.append(line)
                     
@@ -395,13 +389,14 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
                 # analyse the window
                 # remove the first 3 measurements
                 if window_number >= 3:
-                    data = window_analysis(np.array(observation_window), threshold, window_number, sec)
-                    data = [round(value,3) for value in data] + [sec]
-                    # print(data)
+                    data = window_analysis(np.array(observation_window), threshold, window_number)
+                    data = [round(value,3) for value in data] + [typeFile]
                     result.append(data)
                                
                 # reset the observation window
                 observation_window = []
+        print("Number of Anomalies:", nr_anomalies)
+        print("Number of Samples:", nr_samples)
     except KeyboardInterrupt:
         print(">>> Interrupt received, stopping...")
     except Exception as e:
@@ -409,7 +404,7 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
     finally:
         fb.close()
 
-    df = pd.DataFrame(result, columns= features + ['target', 'aggregation'])
+    df = pd.DataFrame(result, columns= features + ['target', 'file'])
     return df
 def main() :
     
@@ -417,8 +412,6 @@ def main() :
     parser = argparse.ArgumentParser()
     # Read from an directory
     parser.add_argument("-d", "--directory", nargs='+')
-    # Wildcard to detect what is normal
-    parser.add_argument("-w", "--wildcard", required=True)
     parser.add_argument('-t'  , '--threshold', type=float, help='the limit to consider a frequency active or not .', required=True)
     parser.add_argument('-ws', '--windowSize', type=int, help='the size of each observation window (seconds).', default=600)
     parser.add_argument('-wo', '--windowOffset', type=int, help='(seconds).', default=5)
@@ -432,21 +425,26 @@ def main() :
         for dir in args.directory:
             for r, d, f in os.walk(dir):
                 for file in f:
-                    if ".dat" in file and args.wildcard in file:
+                    if ".dat" in file:
                         files.append(os.path.join(r, file))
 
+
+    files = sorted(files)
+
     print("Files:",*files, sep='\n')
-    
+
     # register the results in dataframes
     frames = []
-    for f in files[:5]:    
+    for f in files:    
         print("File:", f)
         data = readFile_processFeatures(f, args.windowSize, args.windowOffset, args.threshold)
         frames.append(data)
         print("Nr Registers in file:", len(data))
 
     frames = pd.concat(frames)
-    print("Frames:",frames)
+    frames = frames.reset_index(drop=True)
+    print("Frames:\n",frames)
+
 
     function = ['mean', 'median', 'std', 'max', 'min', 'percentil75', 'percentil90', 'percentil95', 'percentil99']
     base_idea = ['f', 't']
@@ -456,69 +454,65 @@ def main() :
     combination = [(p[0]+'_activity_'+p[1], p[0]+'_silence_'+p[1]) for p in itertools.product(*l)]
 
     # DataFrame for each feature
-    # row = time instant || column = file (each file represents the number of seconds the samples were grouped (1, 5, 10 and 30 seconds))
-    dataframeForEachFeature = []
-    for feature_index, feature in enumerate(combination):
-        
-        feature_activity, feature_silence = feature
 
-        activity_1  = list(frames[ frames['aggregation'] == 1 ][feature_activity])
-        silence_1   = list(frames[ frames['aggregation'] == 1 ][feature_silence]) 
-        activity_5  = list(frames[ frames['aggregation'] == 5 ][feature_activity]) 
-        silence_5   = list(frames[ frames['aggregation'] == 5 ][feature_silence])
-        activity_10 = list(frames[ frames['aggregation'] == 10 ][feature_activity]) 
-        silence_10  = list(frames[ frames['aggregation'] == 10 ][feature_silence])
-        activity_30 = list(frames[ frames['aggregation'] == 30 ][feature_activity]) 
-        silence_30  = list(frames[ frames['aggregation'] == 30 ][feature_silence])
-
-        maximum = max(len(activity_1),len(silence_1), len(activity_5), len(silence_5), len(activity_10), len(silence_10), len(activity_30), len(silence_30))  
-
-        dados = pd.DataFrame(data = dict({ 
-                                    "1 activity"  : activity_1  + [np.nan]* (maximum - len(activity_1)),
-                                    "1 silence"   : silence_1   + [np.nan]* (maximum - len(silence_1)), 
-                                    "5 activity"  : activity_5  + [np.nan]* (maximum - len(activity_5)),
-                                    "5 silence"   : silence_5   + [np.nan]* (maximum - len(silence_5)),    
-                                    "10 activity" : activity_10 + [np.nan]* (maximum - len(activity_10)), 
-                                    "10 silence"  : silence_10  + [np.nan]* (maximum - len(silence_10)),  
-                                    "30 activity" : activity_30 + [np.nan]* (maximum - len(activity_30)),  
-                                    "30 silence"  : silence_30  + [np.nan]* (maximum - len(silence_30))                                                                                                      
-                                }))
-        print(dados)                      
-        dataframeForEachFeature.append(dados)
-    
     # Inicialize variables
     updateMenus = []
     data = []
 
-    # add traces
-    for feature, frame in zip(combination, dataframeForEachFeature):
-        print(feature,'\n',frame)
-        for sec, col in zip([1,5,10,30],range(0,len(frame.columns)-1, 2)):
-            data.append(go.Scatter(x = frame.iloc[:,col], y = frame.iloc[:, col+1], mode="markers", name=feature[0].replace("_activity", "")+"_"+str(sec)+"sec"))
-
     for feature_index, feature in enumerate(combination):
+        print(feature)
+        feature_activity, feature_silence = feature
+
+        activity_clean   = list(frames[ (frames['file'] == 'normal') ][feature_activity])
+        silence_clean    = list(frames[ (frames['file'] == 'normal') ][feature_silence ])
+        activity_anomaly = list(frames[ (frames['file'] == 'anomaly') ][feature_activity]) 
+        silence_anomaly  = list(frames[ (frames['file'] == 'anomaly') ][feature_silence ])
+        
+        maximum = max(len(activity_clean),len(silence_clean), len(activity_anomaly), len(silence_anomaly))
+
+        dados = pd.DataFrame(data = dict({ 
+                                    "normal activity"  : activity_clean  + [np.nan]* (maximum - len(activity_clean)),
+                                    "normal silence"   : silence_clean   + [np.nan]* (maximum - len(silence_clean)), 
+                                    "anomalous activity"  : activity_anomaly  + [np.nan]* (maximum - len(activity_anomaly)),
+                                    "anomalous silence"   : silence_anomaly   + [np.nan]* (maximum - len(silence_anomaly)),    
+                                                                                                                                        
+                                }))
+        
+        # print(dados)
+
+        # add traces
+        data.append(go.Scatter(x = dados["normal activity"], y = dados["normal silence"], mode="markers", name="normal"))
+        data.append(go.Scatter(x = dados["anomalous activity"], y = dados["anomalous silence"], mode="markers", name="anomaly"))
+
+        label = ("Time" if feature_activity.split("_")[-1] == 't' else "Nr of Frequencies")+": "+feature_activity.split("_")[0].capitalize()
         updateMenus.append(
             dict(
                 {
-                    'label': feature[0].replace("_activity", ""),
+                    'label': label,
                     'method': 'update',
                     'args': [
-                        {'visible': [False]*feature_index*4 + [True]*4 + [False]*((len(combination) - feature_index)*4 ) }
+                        {'visible': [False]*feature_index*2 + [True]*2 + [False]*((len(combination) - feature_index)*2 ) }
                     ]
                 }  
             )
         )
-    # print(updateMenus)
 
     # update layout with buttons, and show the figure
-    layout=go.Layout(title = 'Results of each feature',
-                    updatemenus=list([dict(buttons=updateMenus)]),
+    layout=go.Layout(updatemenus=list([dict(buttons=updateMenus)]),
                     xaxis_title="Activity (seconds)",
-                    yaxis_title="Silence (seconds)"
+                    yaxis_title="Silence (seconds)",
+                    width = 800,
+                    height = 600
+
                     )
     
     #defining figure and plotting
     fig = go.Figure(data,layout)
+
+    fig.update_traces(
+        line=dict(dash="dot", width=4),
+        selector=dict(type="scatter", mode="lines"))
+
     fig.show()
 
 if __name__ == '__main__':

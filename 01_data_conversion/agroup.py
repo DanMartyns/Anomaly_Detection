@@ -38,6 +38,7 @@ def main() :
     mean = []
     
     try:
+        data = []
         n_sample = 0
         sampling_window = 0
         sample_sec = np.empty(shape=(0,85))
@@ -61,17 +62,22 @@ def main() :
                 s = np.mean(sample_sec[:,:-1], axis=0)
                 result = np.concatenate(([ sampling_window, line[1]], s))
                 result = np.concatenate((result, [target]))
-                w.write(result)
+                # print("Result:", result, "Size:", len(result))
+                data.append(result)
 
+                if s == []:
+                    print(s)
                 # See the results
                 mean.append(np.mean(s))
                 maximuns.append(max(s))
 
                 # Reset Variables
-                sample_sec = np.empty((0,85))
+                sample_sec = np.empty(shape=(0,85))
                 sampling_window += 1
                 n_sample = 0
 
+        for value in data:
+            w.write(struct.pack("=87d",*value))
 
         mean_maximuns = np.mean(maximuns[1:])
         picos = [x for x in maximuns if x >= 0.99*mean_maximuns ] # all the values higher than the mean (k)

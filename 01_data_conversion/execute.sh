@@ -40,7 +40,7 @@ recursiveDir(){
                 #     python3 hackrfreadbinfile.py -f $f 
                 fi
                 echo "Group Samples"
-                python3 agroup.py -f $(pwd)/data/$filename.dat -s 30
+                python3 agroup.py -f $(pwd)/data/$filename.dat -s 10
                 mv $(pwd)/data/32_15/$filename.dat $(pwd)/$dir
             fi
         fi
