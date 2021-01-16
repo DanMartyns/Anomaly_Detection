@@ -1,5 +1,7 @@
 import os
+import sys
 import struct
+import copy
 import math
 import argparse
 import numpy as np
@@ -15,13 +17,17 @@ import plotly.express as px
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+np.set_printoptions(threshold=sys.maxsize)
+
+import warnings
+warnings.simplefilter('error')
 
 # last EMA
 last_EMA_f = 0
-last_EMA_fc = 0
 # last max
 last_max_f = 0
-last_max_fc = 0
+
+n = 0
 
 # features name
 features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_activity_f', 'min_activity_f', \
@@ -31,7 +37,6 @@ features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_acti
             'DFLP_dispersion_f', 'EMA_trading_f', 'DMI_trading_f', 'aroonUp_trading_f', \
             'mean_activity_fc', 'median_activity_fc', 'std_activity_fc', 'max_activity_fc', 'min_activity_fc', \
             'percentil75_activity_fc', 'percentil90_activity_fc', 'percentil95_activity_fc', 'percentil99_activity_fc', \
-            'EMA_trading_fc', 'DMI_trading_fc', 'aroonUp_trading_fc',
             'mean_activity_t', 'median_activity_t', 'std_activity_t', 'max_activity_t', 'min_activity_t', \
             'percentil75_activity_t', 'percentil90_activity_t', 'percentil95_activity_t', 'percentil99_activity_t', \
             'mean_silence_t', 'median_silence_t', 'std_silence_t', 'max_silence_t', 'min_silence_t', \
@@ -80,235 +85,246 @@ def group_array(lista):
 
     return result if result != [] else [0]
 
-def window_analysis(observation_window, threshold, window_number):
+def window_analysis(observation_window, threshold, window_number, file):
     global last_EMA_f
-    global last_EMA_fc
     global last_max_f
-    global last_max_fc
+    global n
 
-    ######################################################################################
-    ################## Apply the threshold and transcribe to 0s and 1s ###################
-    ######################################################################################
-    # mean_samples = []
-    # for i in observation_window[:,2:-1]:
-    #     mean_samples.append(np.mean(i))
-    
-    function = lambda x, threshold: 1 if x >= threshold else 0
-    vfunc = np.vectorize(function)
-    
-    observation_window[:,2:-1] = vfunc(observation_window[:,2:-1], threshold)
-    # mean_samples = vfunc(mean_samples, threshold)
-    # print(observation_window)
-    # print(mean_samples)
+    try:
 
-    ######################################################################################
-    ################################# Frequency/time #####################################
-    ######################################################################################
-
-    activity = observation_window[:,2:-1]
-    # for x,y in zip(activity.sum(axis=1), observation_window[:,-1]):
-    #     print(x, y)
-    silence = 1-activity
-    # for x in silence.sum(axis=1):
-    #     print(x)
-
-    ## Acitivity/Silence Features
-
-    # Sum by lines
-    sum_by_lines_a = activity.sum(axis=1)
-    # print("Média:", np.mean(sum_by_lines_a))
-
-    # Mean Activity
-    mean_activity = np.mean(sum_by_lines_a)
-    # Median Activity
-    median_activity = np.median(sum_by_lines_a)
-    # Standard deviation Activity
-    std_activity = np.std(sum_by_lines_a)
-    # Percentil 75 activity
-    percentil75_activity = np.percentile(sum_by_lines_a,75)
-    # Percentil 90 activity
-    percentil90_activity = np.percentile(sum_by_lines_a,90)
-    # Percentil 95 activity
-    percentil95_activity = np.percentile(sum_by_lines_a,95)
-    # Percentil 99 activity
-    percentil99_activity = np.percentile(sum_by_lines_a,99)
-    # Min Activity
-    min_activity = np.min(sum_by_lines_a)
-    # Max Activity
-    max_activity = np.max(sum_by_lines_a)
-
-    # Sum by lines
-    sum_by_lines = silence.sum(axis=1)
-
-    # Mean Silence
-    mean_silence = np.mean(sum_by_lines)
-    # Median Silence
-    median_silence = np.median(sum_by_lines)
-    # Standard deviation Silence
-    std_silence = np.std(sum_by_lines)
-    # Percentil 75 silence
-    percentil75_silence = np.percentile(sum_by_lines,75)
-    # Percentil 90 silence
-    percentil90_silence = np.percentile(sum_by_lines,90)
-    # Percentil 95 silence
-    percentil95_silence = np.percentile(sum_by_lines,95)
-    # Percentil 99 silence
-    percentil99_silence = np.percentile(sum_by_lines,99)
-    # Min silence
-    min_silence = np.min(sum_by_lines)
-    # Max silence
-    max_silence = np.max(sum_by_lines)
-
-    dflp = []
-
-    ## Dispersion Feature
-    # Difference between the first and the last active position
-    for sample in activity:
-        indices = [i for i, x in enumerate(sample) if x == 1]
-        if len(indices) > 1:
-            dflp.append(indices[-1] - indices[0])
-        else:
-            dflp.append(0)
+        ######################################################################################
+        ################## Apply the threshold and transcribe to 0s and 1s ###################
+        ######################################################################################
         
-    DFLP = np.mean(dflp)
-    
-    ## Trading features
-    # EMA
-    observation_windows_considered = 2
-    k = 2/(observation_windows_considered + 1)
-    EMA_f = 0
-    if window_number == 1:
-        EMA_f = round(mean_activity,3)
-        last_EMA_f = EMA_f
-    else:
-        EMA_f = round(mean_activity * k + last_EMA_f * (1-k),3)
-        last_EMA_f = EMA_f
-    
-    # Aroon Up
-    max_position = list(sum_by_lines_a).index(max(sum_by_lines_a))
-    aroonUp_f = len(observation_window) - max_position
+        function = lambda x, threshold: 1 if x >= threshold else 0
+        vfunc = np.vectorize(function)
+        
+        observation_window[:,2:-1] = vfunc(observation_window[:,2:-1], threshold)
 
-    # DMI
-    DMI_f = 0
-    if last_max_f != 0:
-        UpMove = max_activity - last_max_f
-        if UpMove > 0:
-            DMI_f = UpMove
+        ######################################################################################
+        ################################# Frequency/time #####################################
+        ######################################################################################
 
-    last_max_f = max_activity
+        ob_window = []
+        if ('anomaly' in file):
+            ob_window = observation_window[ np.where(observation_window[:,-1] == 1) ][:,2:-1]
+        else:
+            ob_window = observation_window[:,2:-1]
+        
+        activity = ob_window
+        silence = 1-activity
+        
+        ## Acitivity/Silence Features
 
-    ######################################################################################
-    ############################# Consecutive Frequency/time #############################
-    ######################################################################################    
+        # Sum by lines
+        sum_by_lines_a = activity.sum(axis=1)
+        # print("Média:", np.mean(sum_by_lines_a))
+        # print(sum_by_lines_a)
+        # Mean Activity
+        mean_activity = np.mean(sum_by_lines_a)
+        # Median Activity
+        median_activity = np.median(sum_by_lines_a)
+        # Standard deviation Activity
+        std_activity = np.std(sum_by_lines_a)
+        # Percentil 75 activity
+        percentil75_activity = np.percentile(sum_by_lines_a,75)
+        # Percentil 90 activity
+        percentil90_activity = np.percentile(sum_by_lines_a,90)
+        # Percentil 95 activity
+        percentil95_activity = np.percentile(sum_by_lines_a,95)
+        # Percentil 99 activity
+        percentil99_activity = np.percentile(sum_by_lines_a,99)
+        # Min Activity
+        min_activity = np.min(sum_by_lines_a)
+        # Max Activity
+        max_activity = np.max(sum_by_lines_a)
 
-    activity_fc = group_list(activity)
-    # print(activity_fc)
+        # Sum by lines
+        sum_by_lines = silence.sum(axis=1)
 
-    ## Acitivity/Silence Features
+        # Mean Silence
+        mean_silence = np.mean(sum_by_lines)
+        # Median Silence
+        median_silence = np.median(sum_by_lines)
+        # Standard deviation Silence
+        std_silence = np.std(sum_by_lines)
+        # Percentil 75 silence
+        percentil75_silence = np.percentile(sum_by_lines,75)
+        # Percentil 90 silence
+        percentil90_silence = np.percentile(sum_by_lines,90)
+        # Percentil 95 silence
+        percentil95_silence = np.percentile(sum_by_lines,95)
+        # Percentil 99 silence
+        percentil99_silence = np.percentile(sum_by_lines,99)
+        # Min silence
+        min_silence = np.min(sum_by_lines)
+        # Max silence
+        max_silence = np.max(sum_by_lines)
 
-    # Mean Activity
-    mean_activity_fc = np.mean(activity_fc)
-    # Median Activity
-    median_activity_fc = np.median(activity_fc)
-    # Standard deviation Activity
-    std_activity_fc = np.std(activity_fc)
+        dflp = []
 
-    # Percentil 75 activity
-    percentil75_activity_fc = np.percentile(activity_fc,75)
-    # Percentil 90 activity
-    percentil90_activity_fc = np.percentile(activity_fc,90)
-    # Percentil 95 activity
-    percentil95_activity_fc = np.percentile(activity_fc,95)
-    # Percentil 99 activity
-    percentil99_activity_fc = np.percentile(activity_fc,99)
-    # Min Activity
-    min_activity_fc = np.min(activity_fc)
-    # Max Activity
-    max_activity_fc = np.max(activity_fc)
+        ## Dispersion Feature
+        # Difference between the first and the last active position
+        for sample in activity:
+            indices = [i for i, x in enumerate(sample) if x == 1]
+            if len(indices) > 1:
+                dflp.append(indices[-1] - indices[0])
+            else:
+                dflp.append(0)
+            
+        DFLP = np.mean(dflp)
 
-    ## Trading features
-    # EMA
-    observation_windows_considered = 5
-    k = 2/(observation_windows_considered + 1)
-    EMA_fc = 0
-    if window_number == 1:
-        EMA_fc = mean_activity_fc
-        last_EMA_fc = EMA_fc
-    else:
-        EMA_fc = mean_activity_fc * k + last_EMA_fc * (1-k)
-        last_EMA_fc = EMA_fc
+        ## Trading features
+        
+        # Aroon Up
+        max_position = list(sum_by_lines_a).index(max(sum_by_lines_a))
+        aroonUp_f = len(observation_window) - max_position
 
-    # Aroon Up
-    max_position = list(activity_fc).index(max(activity_fc))
-    aroonUp_fc = len(observation_window) - max_position
+        # DMI
+        DMI_f = 0
+        if last_max_f != 0:
+            UpMove = max_activity - last_max_f
+            if UpMove > 0:
+                DMI_f = UpMove
 
-    # DMI
-    DMI_fc = 0
-    if last_max_fc != 0:
-        UpMove = max_activity_fc - last_max_fc
-        if UpMove > 0:
-            DMI_fc = UpMove
+        last_max_f = max_activity
 
-    last_max_fc = max_activity_fc
+        # EMA
+        # Exponential moving average = (Close - previous EMA) * (2 / n+1) + previous EMA
+        # https://www.thebalance.com/simple-exponential-and-weighted-moving-averages-1031196
+        sum_by_lines_a = observation_window[:,2:-1].sum(axis=1)
+        mean_activity = np.mean(sum_by_lines_a)
+        observation_windows_considered = 6
+        k = 2/(observation_windows_considered + 1)
+        EMA_f = 0
+        if window_number == 1:
+            EMA_f = round(mean_activity,3)
+            last_EMA_f = EMA_f
+        else:
+            EMA_f = (mean_activity - last_EMA_f) * k + last_EMA_f
+            EMA_f = round(EMA_f,3)
+            last_EMA_f = EMA_f
 
-    ######################################################################################
-    ################################# Activity over time #################################
-    ######################################################################################
-    
-    # Noise activates 2 frequencies, so it will be considered a moment of activity if an instant of time has more than two active frequencies
-    function = lambda x: 1 if x > 2 else 0
-    vfunc = np.vectorize(function)
-    activity = vfunc(activity.sum(axis=1))
-    silence = 1 - activity
-    # print("Silence:", silence)
+        ######################################################################################
+        ################################# Activity over time #################################
+        ######################################################################################
+        
+        # Noise activates 2 frequencies, so it will be considered a moment of activity if an instant of time has more than two active frequencies
+        function = lambda x: 1 if x > 3 else 0
+        vfunc = np.vectorize(function)
+        activity = observation_window[:,2:-1]
+        activity = vfunc(activity.sum(axis=1))
+        silence = 1 - activity
 
+        if 'anomaly' in file and len(activity) > 2:
+            # print("Activity:", activity)
+            # print("Group act:", group_array(activity))
+            tmp = copy.deepcopy(activity)
+            for i in np.arange(0, len(activity)-10):
+                if activity[i] == 1 and activity[i+10] == 1:
+                    for x in np.arange(1,10):
+                        tmp[i+x] = 1
+            activity = tmp
+            for i in np.arange(0, len(activity)-2):
+                if activity[i] == 0 and activity[i+2]==0:
+                    tmp[i+1] = 0
 
-    activity = group_array(activity)
-    # print(activity)
-    silence = group_array(silence)
-    # print(silence)
+            # print('Temporar:',tmp)
+            # print("Group tmp:", group_array(tmp),'\n')
 
-    # Mean Activity
-    mean_activity_t = np.mean(activity) 
-    # Median Activity
-    median_activity_t = np.median(activity)
-    # Standard deviation Activity
-    std_activity_t = np.std(activity)
+        activity = group_array(activity)
+        silence = group_array(silence)
 
-    # Percentil 75 activity
-    percentil75_activity_t = np.percentile(activity,75)
-    # Percentil 90 activity
-    percentil90_activity_t = np.percentile(activity,90)
-    # Percentil 95 activity
-    percentil95_activity_t = np.percentile(activity,95)
-    # Percentil 99 activity
-    percentil99_activity_t = np.percentile(activity,99)
-    # Min Activity
-    min_activity_t = np.min(activity)
-    # Max Activity
-    max_activity_t = np.max(activity)
+        # if 'anomaly' in file and len(activity) > 2:
+            # print(activity)
+            # activity = sorted(activity, reverse=True)[:2]
+        
+        activity = np.array([x for x in activity if x != 1 and x!=2])
 
-    # Mean Silence
-    mean_silence_t = np.mean(silence)
-    # Median Silence
-    median_silence_t = np.median(silence)
-    # Standard deviation Silence
-    std_silence_t = np.std(silence)
-    # Percentil 75 silence
-    percentil75_silence_t = np.percentile(silence,75)
-    # Percentil 90 silence
-    percentil90_silence_t = np.percentile(silence,90)
-    # Percentil 95 silence
-    percentil95_silence_t = np.percentile(silence,95)
-    # Percentil 99 silence
-    percentil99_silence_t = np.percentile(silence,99)
-    # Min silence
-    min_silence_t = np.min(silence)
-    # Max silence
-    max_silence_t = np.max(silence)
+        # Mean Activity
+        mean_activity_t = np.mean(activity) 
+        # print("Mean Activity:", mean_activity_t)
+        # Median Activity
+        median_activity_t = np.median(activity)
+        # Standard deviation Activity
+        std_activity_t = np.std(activity)
 
-    target = np.max(observation_window[:, -1])
+        # Percentil 75 activity
+        percentil75_activity_t = np.percentile(activity,75)
+        # Percentil 90 activity
+        percentil90_activity_t = np.percentile(activity,90)
+        # Percentil 95 activity
+        percentil95_activity_t = np.percentile(activity,95)
+        # Percentil 99 activity
+        percentil99_activity_t = np.percentile(activity,99)
+        # Min Activity
+        min_activity_t = np.min(activity)
+        # Max Activity
+        max_activity_t = np.max(activity)
 
+        # Mean Silence
+        mean_silence_t = np.mean(silence)
+        # print("Mean Activity:", mean_activity_t.shape, "Mean Silence:", mean_silence_t.shape)
+        # Median Silence
+        median_silence_t = np.median(silence)
+        # Standard deviation Silence
+        std_silence_t = np.std(silence)
+        # Percentil 75 silence
+        percentil75_silence_t = np.percentile(silence,75)
+        # Percentil 90 silence
+        percentil90_silence_t = np.percentile(silence,90)
+        # Percentil 95 silence
+        percentil95_silence_t = np.percentile(silence,95)
+        # Percentil 99 silence
+        percentil99_silence_t = np.percentile(silence,99)
+        # Min silence
+        min_silence_t = np.min(silence)
+        # Max silence
+        max_silence_t = np.max(silence)
+
+        ######################################################################################
+        ############################# Consecutive Frequency/time #############################
+        ######################################################################################    
+        activity_fc = []
+        function = lambda x: 1 if x > 2 else 0
+        vfunc = np.vectorize(function)
+        activity = observation_window[:,2:-1]
+        activity = vfunc(activity.sum(axis=1))
+
+        for ac, ob in zip(activity, ob_window):
+            if ac == 1:
+                activity_fc += group_array(ob)
+        
+        if activity_fc == []:
+            activity_fc += [0]
+
+        # print(activity_fc)
+        ## Acitivity/Silence Features
+
+        # Mean Activity
+        mean_activity_fc = np.mean(activity_fc)
+        # Median Activity
+        median_activity_fc = np.median(activity_fc)
+        # Standard deviation Activity
+        std_activity_fc = np.std(activity_fc)
+
+        # Percentil 75 activity
+        percentil75_activity_fc = np.percentile(activity_fc,75)
+        # Percentil 90 activity
+        percentil90_activity_fc = np.percentile(activity_fc,90)
+        # Percentil 95 activity
+        percentil95_activity_fc = np.percentile(activity_fc,95)
+        # Percentil 99 activity
+        percentil99_activity_fc = np.percentile(activity_fc,99)
+        # Min Activity
+        min_activity_fc = np.min(activity_fc)
+        # Max Activity
+        max_activity_fc = np.max(activity_fc)
+
+        target = np.max(observation_window[:, -1])
+
+    except Exception as e:
+        print(e)
 
     return [ mean_activity, median_activity, std_activity, max_activity, min_activity,
             percentil75_activity, percentil90_activity, percentil95_activity, percentil99_activity,
@@ -317,7 +333,6 @@ def window_analysis(observation_window, threshold, window_number):
             DFLP, EMA_f, DMI_f, aroonUp_f,
             mean_activity_fc, median_activity_fc, std_activity_fc, max_activity_fc, min_activity_fc,
             percentil75_activity_fc, percentil90_activity_fc, percentil95_activity_fc, percentil99_activity_fc,
-            EMA_fc, DMI_fc, aroonUp_fc,
             mean_activity_t, median_activity_t, std_activity_t, max_activity_t, min_activity_t,
             percentil75_activity_t, percentil90_activity_t, percentil95_activity_t, percentil99_activity_t,
             mean_silence_t, median_silence_t, std_silence_t, max_silence_t, min_silence_t,
@@ -369,7 +384,6 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
             # The observation window will have de size of window size
             if sample < window_size:
                 # print("Line:",line)
-                # if ('anomaly' in file and line[-1] == 1) or ('normal' in file):
                 observation_window.append(line)
                     
                 # increase the number of samples inside the window
@@ -389,9 +403,10 @@ def readFile_processFeatures(file, window_size, window_offset, threshold):
                 # analyse the window
                 # remove the first 3 measurements
                 if window_number >= 3:
-                    data = window_analysis(np.array(observation_window), threshold, window_number)
-                    data = [round(value,3) for value in data] + [typeFile]
-                    result.append(data)
+                    data = window_analysis(np.array(observation_window), threshold, window_number, file)
+                    if data != []:
+                        data = [round(value,3) for value in data] + [typeFile]
+                        result.append(data)
                                
                 # reset the observation window
                 observation_window = []
@@ -451,7 +466,11 @@ def main() :
 
     l = [function, base_idea]
 
-    combination = [(p[0]+'_activity_'+p[1], p[0]+'_silence_'+p[1]) for p in itertools.product(*l)]
+    combination = [(p[0]+'_activity_'+p[1], p[0]+'_silence_'+p[1]) for p in itertools.product(*l)] 
+
+    comb = [ 'DFLP_dispersion_f', 'EMA_trading_f', 'DMI_trading_f', 'aroonUp_trading_f', \
+            'mean_activity_fc', 'median_activity_fc', 'std_activity_fc', 'max_activity_fc', 'min_activity_fc', \
+            'percentil75_activity_fc', 'percentil90_activity_fc', 'percentil95_activity_fc', 'percentil99_activity_fc' ]
 
     # DataFrame for each feature
 
@@ -483,6 +502,7 @@ def main() :
         # add traces
         data.append(go.Scatter(x = dados["normal activity"], y = dados["normal silence"], mode="markers", name="normal"))
         data.append(go.Scatter(x = dados["anomalous activity"], y = dados["anomalous silence"], mode="markers", name="anomaly"))
+        
 
         label = ("Time" if feature_activity.split("_")[-1] == 't' else "Nr of Frequencies")+": "+feature_activity.split("_")[0].capitalize()
         updateMenus.append(
@@ -497,11 +517,50 @@ def main() :
             )
         )
 
+    # for feature_index, feature in enumerate(comb):
+    #     activity_clean   = list(frames[ (frames['file'] == 'normal') ][feature])
+    #     activity_anomaly = list(frames[ (frames['file'] == 'anomaly') ][feature]) 
+
+    #     if ('EMA' in feature) or ('DMI' in feature):
+    #         data.append(go.Scatter(x=np.arange(0,len(activity_clean)), y=activity_clean, mode='markers', name='normal'))
+    #         data.append(go.Scatter(x=np.arange(0,len(activity_anomaly)), y=activity_anomaly, mode='markers', name='anomaly'))
+    #     else:
+    #         data.append(go.Box(y=activity_clean, name='normal'))
+    #         data.append(go.Box(y=activity_anomaly, name='anomaly'))
+
+    #     l = [ 'DFLP', 'EMA', 'DMI', 'Aroon Up', 'Mean', 'Median', 'Std', 'Max', 'Min', 'Percentil 75', 'Percentil 90', 'Percentil 95', 'Percentil 99']
+
+    #     label = ("Consecutive Active Frequencies" if feature.split("_")[-1] == 'fc' else ("Nr of Frequencies" if feature.split("_")[-1] == 'f' else 'Time'))+": "+l[feature_index]
+
+    #     updateMenus.append(
+    #         dict(
+    #             {
+    #                 'label': label,
+    #                 'method': 'update',
+    #                 'args': [
+    #                     {'visible': [False]*feature_index*2 + [True]*2 + [False]*((len(comb) - feature_index)*2 ) }
+    #                 ]
+    #             }  
+    #         )
+    #     )        
+
     # update layout with buttons, and show the figure
-    layout=go.Layout(updatemenus=list([dict(buttons=updateMenus)]),
-                    xaxis_title="Activity (seconds)",
-                    yaxis_title="Silence (seconds)",
-                    width = 800,
+    layout=go.Layout(updatemenus=list([dict(buttons=updateMenus,
+                                            direction="down",
+                                            pad={"r": 10, "t": 10},
+                                            showactive=True,
+                                            x=0.0,
+                                            xanchor="left",
+                                            y=1.15,
+                                            yanchor="top")]),
+                    xaxis_title="Activity time (seconds)",
+                    yaxis_title="Silence time (seconds)",
+                    # xaxis = dict(
+                    #     tickmode = 'linear',
+                    #     tick0 = 0,
+                    #     dtick = 100
+                    # ),
+                    width = 600,
                     height = 600
 
                     )

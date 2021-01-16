@@ -8,7 +8,7 @@ fi
 recursiveDir(){
     declare -i ws=$2
     declare -i wo=$3
-    declare -i thr=$4
+    declare -r thr=$4
     for f in $1/*
     do 
         if [ -d "$f" ]

@@ -55,6 +55,18 @@ class color:
    UNDERLINE = '\033[4m'
    END = '\033[0m'
 
+# features name
+features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_activity_f', 'min_activity_f', 
+'percentil75_activity_f', 'percentil90_activity_f', 'percentil95_activity_f', 'percentil99_activity_f',
+'mean_silence_f', 'median_silence_f', 'std_silence_f', 'max_silence_f', 'min_silence_f',
+'percentil75_silence_f', 'percentil90_silence_f', 'percentil95_silence_f', 'percentil99_silence_f',
+'DFLP_dispersion_f', 'EMA_trading_f', 'DMI_trading_f', 'aroonUp_trading_f',
+'mean_activity_fc', 'median_activity_fc', 'std_activity_fc', 'max_activity_fc', 'min_activity_fc',
+'percentil75_activity_fc', 'percentil90_activity_fc', 'percentil95_activity_fc', 'percentil99_activity_fc',
+'mean_activity_t', 'median_activity_t', 'std_activity_t', 'max_activity_t', 'min_activity_t',
+'percentil75_activity_t', 'percentil90_activity_t', 'percentil95_activity_t', 'percentil99_activity_t',
+'mean_silence_t', 'median_silence_t', 'std_silence_t', 'max_silence_t', 'min_silence_t',
+'percentil75_silence_t', 'percentil90_silence_t', 'percentil95_silence_t', 'percentil99_silence_t']
 
 '''
     Calculate the mean confidance with a confidance interval of 95%
@@ -79,20 +91,6 @@ def mean_confidence_interval(data, alpha=5.0):
     The features that maximize the result have been previously calculated.
 '''
 def featuresToKeep(data, components):
-    
-    features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_activity_f', 'min_activity_f', \
-            'percentil75_activity_f', 'percentil90_activity_f', 'percentil95_activity_f', 'percentil99_activity_f', \
-            'mean_silence_f', 'median_silence_f', 'std_silence_f', 'max_silence_f', 'min_silence_f', \
-            'percentil75_silence_f', 'percentil90_silence_f', 'percentil95_silence_f', 'percentil99_silence_f', \
-            'DFLP_dispersion_f', 'EMA_trading_f', 'DMI_trading_f', 'aroonUp_trading_f', \
-            'mean_activity_fc', 'median_activity_fc', 'std_activity_fc', 'max_activity_fc', 'min_activity_fc', \
-            'percentil75_activity_fc', 'percentil90_activity_fc', 'percentil95_activity_fc', 'percentil99_activity_fc', \
-            'EMA_trading_fc', 'DMI_trading_fc', 'aroonUp_trading_fc',
-            'mean_activity_t', 'median_activity_t', 'std_activity_t', 'max_activity_t', 'min_activity_t', \
-            'percentil75_activity_t', 'percentil90_activity_t', 'percentil95_activity_t', 'percentil99_activity_t', \
-            'mean_silence_t', 'median_silence_t', 'std_silence_t', 'max_silence_t', 'min_silence_t', \
-            'percentil75_silence_t', 'percentil90_silence_t', 'percentil95_silence_t', 'percentil99_silence_t']
-
 
     dataset = pd.DataFrame(data=data)
     dataset.columns = features + ['target']
@@ -103,7 +101,7 @@ def featuresToKeep(data, components):
 
     classification_system = { feature: 0 for feature in features}
     
-    for i in range(1,50):
+    for i in range(1,200):
         
         # Building the model 
         extra_tree_forest = ExtraTreesClassifier(n_estimators = 5, criterion ='entropy', max_features = 2)
@@ -129,9 +127,9 @@ def featuresToKeep(data, components):
         We repeat the process n times. The n=10 was sufficient to features keep in the same position of the classification system.
     '''
 
-    ######################################################################
-    ##################### Plot the feature importance ####################
-    ######################################################################
+    #####################################################################
+    #################### Plot the feature importance ####################
+    #####################################################################
 
     # z = [y for x,y in classification_system.items()]
     # x = [x for x,y in classification_system.items()]
@@ -155,8 +153,8 @@ def featuresToKeep(data, components):
     #         'xanchor': 'center',
     #         'yanchor': 'top'},
     #     autosize = False,
-    #     width= 1700,
-    #     height= 800
+    #     width= 1500,
+    #     height= 600
     #     )
 
     # app.layout = html.Div(children=[
@@ -180,7 +178,18 @@ def featuresToKeep(data, components):
         if feature in featuresKeeped:
             result[index] = feature
     
+    print("Result:", result)
     return result
+
+def combinations(gamma, kernel, nu, degree):
+    result = ( ["classifier.append(svm.OneClassSVM(gamma={}, nu={}, kernel='{}', degree={}))".format(g,n,k,d)]
+            for g in gamma
+            for k in kernel
+            for n in nu
+            for d in degree)
+
+    result = [item for sublist in list(result) for item in sublist]
+    return dict( (index,['OC-SVM', value]) for index, value in enumerate(result)) 
 
 def readFileToMatrix(files) :
     assert len(files) > 0
@@ -194,13 +203,13 @@ def readFileToMatrix(files) :
         try:
             while True:
                 # read each line of the file
-                record=fb.read(424)
+                record=fb.read(400)
                 
                 # break when the line was empty
-                if(len(record) < 424): break
+                if(len(record) < 400): break
                 
                 # unpack the record
-                line = list(struct.unpack('=53d',record))
+                line = list(struct.unpack('=50d',record))
                 
                 if ('anomaly' in filename and line[-1] == 1) or ('normal' in filename):    
                     # append the line to matrix
@@ -211,15 +220,6 @@ def readFileToMatrix(files) :
 
     matrix = np.array(matrix)
     return matrix
-
-def combinations(gamma, kernel, nu, degree):
-    result = ( ["classifier.append(svm.OneClassSVM(gamma={}, nu={}, kernel='{}', degree={}))".format(g,n,k,d)]
-            for g in gamma
-            for k in kernel
-            for n in nu
-            for d in degree)
-
-    return [item for sublist in list(result) for item in sublist]
 
 '''
     Calculate the F1-Score 
@@ -263,7 +263,9 @@ def print_results(anomaly_pred, regular_pred):
     precision = tp/(tp+fp) * 100
     recall = tp/(tp+fn) * 100
     f1_score = 2 * ((precision * recall)/(precision + recall))
-    print("Score: {:.2f}%".format(f1_score))
+    print("F1-Score: {:.2f}%".format(f1_score))
+    print("Precision:{:.2f}%".format(precision))
+    print("Recall:{:.2f}%".format(recall))
     print("Confusion matrix:")
     print(pd.DataFrame([[tp, fp], [fn, tn]], ["Pred Normal", "Pred Anomaly"], ["Actual Normal", "Actual Anomaly"]))
     print("----------------------------------------------------------")
@@ -281,7 +283,7 @@ def remove_algorithms(score):
     values = []
 
     for i in range(0, len(score)):
-        if score[i] < median and (math.floor(score[i-1] - score[i]) >= 4*step or median - score[i] > 6*step):
+        if score[i] < median and (math.floor(score[i-1] - score[i]) >= 0.5*step or median - score[i] > 2*step):
             values.append(score[i])
 
     print([x for i, x in enumerate(remv) if x not in values])
@@ -304,11 +306,16 @@ def decide(pred, ignore=[]):
 '''
     Predict the values
 '''
-def predict(files, scaler, clf, pca, features):
+def predict(files, scaler, clf, pca, feat):
+    # print("Files 0:\n", *files, sep='\n')
     data = pd.DataFrame(data=readFileToMatrix(files))
-    data = data.iloc[:, list(features.keys()) + [-1]]
-    data.columns = list(features.values()) + ['target']
-    
+    # print("Data 0 :\n",data)
+    # print("Features :\n",feat)
+    data = data.iloc[:, list(feat.keys()) + [-1] ]
+    data.columns = list(feat.values()) + ['target']
+    # print("Data 1 :\n",data)
+    # data.columns = features + ['target']
+
     Y = data['target']
     X = data.drop('target', axis=1)
 
@@ -322,25 +329,27 @@ def predict(files, scaler, clf, pca, features):
     return clf.predict(data)    
 
 def choose_algorithm(argument): 
-    gamma = [0.001, 0.01, "\'auto\'"]
-    kernel = ['poly', 'linear', 'rbf']
+
+    gamma = [0.001, 0.01, 0.1, 0.5]
+    kernel = ['poly', 'linear', 'sigmoid']
     nu = [0.001, 0.01, 0.5 ]
     degree = [3]
 
     classifier = []
-    for cl in combinations(gamma, kernel, nu, degree):
-            exec(cl)
+    comb = combinations(gamma, kernel, nu, degree)
 
-    classifier = classifier + [ svm.OneClassSVM(kernel='linear'),
-                                svm.OneClassSVM(gamma=0.01, kernel='linear', nu=0.001),
-                                svm.OneClassSVM(gamma=0.001, kernel='linear', nu=0.001),
-                                svm.OneClassSVM(gamma=0.01, kernel='poly', nu=0.01),
-                                svm.OneClassSVM(degree=1, gamma='auto', kernel='poly'),
-                                svm.OneClassSVM(gamma=0.001, nu=0.001),
-                                svm.OneClassSVM(gamma=0.001, nu=0.01),
-                                svm.OneClassSVM(gamma=0.01, kernel='sigmoid', nu=0.01),
-                                svm.OneClassSVM(gamma=0.01, kernel='sigmoid', nu=0.001)
-                            ]
+    for index, cl in comb.items():
+        exec(cl[1])
+
+    classifier =  [ 
+                svm.OneClassSVM(gamma=0.001, kernel='linear', nu=0.001),
+                svm.OneClassSVM(gamma=0.01, kernel='poly', nu=0.01),
+                svm.OneClassSVM(degree=1, gamma='auto', kernel='poly'),
+                svm.OneClassSVM(gamma=0.001, nu=0.001),
+                svm.OneClassSVM(gamma=0.001, nu=0.01),
+                svm.OneClassSVM(gamma=0.01, kernel='sigmoid', nu=0.01),
+                svm.OneClassSVM(gamma=0.01, kernel='sigmoid', nu=0.001)
+            ]
     algorithms = { 
         "SVM": classifier
     } 
@@ -386,7 +395,7 @@ def main():
     CV_test_normal = []
     CV_test_anomaly = []
 
-    kfold_splits = 6
+    kfold_splits = 3
     kf = KFold(n_splits=kfold_splits)
 
     # Prealloc dataFrame; it's much more faster when add a new row
@@ -410,7 +419,7 @@ def main():
                         args.files.append(os.path.join(r, file))
 
     # Read files and keep only the features selected
-    features = featuresToKeep(readFileToMatrix(args.files), args.comp)
+    feat = featuresToKeep(readFileToMatrix(args.files), comp)
 
     # Divide filenames in normal or anomaly depending on the wildcard
     for f in args.files:
@@ -422,6 +431,8 @@ def main():
     
     clean_files = np.array(clean_files)
     anomaly_files = np.array(anomaly_files)
+
+    # classif = {}
 
     # Split Clean and Anomalous files into train and test datasets
     for clean, anomaly in zip(kf.split(clean_files), kf.split(anomaly_files)):
@@ -449,12 +460,13 @@ def main():
         print("\nClean Files:\n",*cv_test_normal, sep="\n")
         
         # Read file into a DataFrame
-        train_data = pd.DataFrame(data=readFileToMatrix(np.concatenate((cv_train_normal, cv_train_anomaly))))
+        train_data = pd.DataFrame(data=readFileToMatrix(cv_train_normal))
         # Select the columns corresponding to the selected features
-        train_data = train_data.iloc[:,list(features.keys()) + [-1] ]
+        train_data = train_data.iloc[:,list(feat.keys()) + [-1] ]
         # To each column assign the feature name
-        train_data.columns = list(features.values()) + ['target']    
-
+        train_data.columns = list(feat.values()) + ['target']    
+        # train_data.columns = features + ['target']
+        
         # Split the data between data and labels
         Y = train_data['target']
         X = train_data.drop('target', axis=1)
@@ -466,7 +478,7 @@ def main():
         X = scaler.fit_transform(X)
         
         # Apply PCA to feature reduction        
-        pca = PCA(n_components=5)
+        pca = PCA(n_components=comp)
         # X = pca.fit_transform(X)
         
         score = []
@@ -479,11 +491,16 @@ def main():
             cl.fit(X)
 
             # Predict
-            regu_data = predict( cv_test_normal, scaler, cl, pca, features ).reshape(-1,1)
-            anom_data = predict( cv_test_anomaly, scaler, cl, pca, features ).reshape(-1,1)
+            regu_data = predict( cv_test_normal, scaler, cl, pca, feat ).reshape(-1,1)
+            anom_data = predict( cv_test_anomaly, scaler, cl, pca, feat ).reshape(-1,1)
 
             calc = calc_score(anom_data, regu_data)
             print("Calc:", calc)
+
+            # if cl not in classif:
+            #     classif[cl] = [calc]
+            # else:
+            #     classif[cl] += [calc]
 
             if not np.isnan(calc):
             
@@ -538,6 +555,8 @@ def main():
     print(color.BOLD+"\nConfusion matrix:"+color.END)
     print(pd.DataFrame([[ int(float(meanResultsWithIntervals.loc['TP']['Mean'])), int(float(meanResultsWithIntervals.loc['FP']['Mean'])) ], [ int(float(meanResultsWithIntervals.loc['FN']['Mean'])) , int(float(meanResultsWithIntervals.loc['TN']['Mean'])) ]], ["Actual Normal", "Actual Anomaly"], ["Predicted Normal", "Predicted Anomaly"]))
   
+
+    #print(*classif.items())
 
     ######################################################################
     ######### Plot F1-Score depending the number of Features #############

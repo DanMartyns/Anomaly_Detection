@@ -32,15 +32,15 @@ recursiveDir(){
                 if [[ $filename == *"anomaly"* ]];
                 then
                     echo "Input File: "$f
-                #     txt=$(find ../00_data_extraction/$dir -iname '*.txt')
-                #     echo "Auxiliar File: "$txt
-                #     python3 hackrfreadbinfile.py -f $f -fi $txt
+                    txt=$(find ../00_data_extraction/$dir -iname '*.txt')
+                    echo "Auxiliar File: "$txt
+                    python3 hackrfreadbinfile.py -f $f -fi $txt
                 else
                     echo "Input File: "$f
-                #     python3 hackrfreadbinfile.py -f $f 
+                    python3 hackrfreadbinfile.py -f $f 
                 fi
                 echo "Group Samples"
-                python3 agroup.py -f $(pwd)/data/$filename.dat -s 10
+                python3 agroup.py -f $(pwd)/data/$filename.dat -s 1
                 mv $(pwd)/data/32_15/$filename.dat $(pwd)/$dir
             fi
         fi

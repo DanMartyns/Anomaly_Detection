@@ -1,16 +1,14 @@
 #!/bin/bash
 
-declare -i ARG1="243"
-declare -i ARG2="81"
-declare -i ARG3="-66"
-
-declare -i sec=81
+declare -i ARG1="600"
+declare -i ARG2="5"
+declare -r ARG3="-64"
 
 echo 
-echo "Testing Observation Window with $((ARG1/sec)) sec, Observation Offset $((ARG2/sec)) sec and Threshold $ARG3 "
+echo "Testing Observation Window with $ARG1 sec, Observation Offset $ARG2 sec and Threshold $ARG3 "
 echo
 
-bash 02_data_processing/execute.sh "$ARG1" "$ARG2" "$ARG3"
+bash 02_data_processing/execute.sh "$ARG1" "$ARG2" $ARG3
 for n in {3..18}
 do
     echo
