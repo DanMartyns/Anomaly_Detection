@@ -47,25 +47,25 @@ class color:
    UNDERLINE = '\033[4m'
    END = '\033[0m'
 
+# features name
+features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_activity_f', 'min_activity_f', 
+'percentil75_activity_f', 'percentil90_activity_f', 'percentil95_activity_f', 'percentil99_activity_f',
+'mean_silence_f', 'median_silence_f', 'std_silence_f', 'max_silence_f', 'min_silence_f',
+'percentil75_silence_f', 'percentil90_silence_f', 'percentil95_silence_f', 'percentil99_silence_f',
+'DFLP_dispersion_f', 'EMA_trading_f', 'DMI_trading_f', 'aroonUp_trading_f',
+'mean_activity_fc', 'median_activity_fc', 'std_activity_fc', 'max_activity_fc', 'min_activity_fc',
+'percentil75_activity_fc', 'percentil90_activity_fc', 'percentil95_activity_fc', 'percentil99_activity_fc',
+'mean_activity_t', 'median_activity_t', 'std_activity_t', 'max_activity_t', 'min_activity_t',
+'percentil75_activity_t', 'percentil90_activity_t', 'percentil95_activity_t', 'percentil99_activity_t',
+'mean_silence_t', 'median_silence_t', 'std_silence_t', 'max_silence_t', 'min_silence_t',
+'percentil75_silence_t', 'percentil90_silence_t', 'percentil95_silence_t', 'percentil99_silence_t']
+
+
 '''
     Select the features that maximize the F1-Score using the Extra Tree Classifier. 
     The features that maximize the result have been previously calculated.
 '''
-def featuresToKeep(data):
-    
-    features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_activity_f', 'min_activity_f', \
-            'percentil75_activity_f', 'percentil90_activity_f', 'percentil95_activity_f', 'percentil99_activity_f', \
-            'mean_silence_f', 'median_silence_f', 'std_silence_f', 'max_silence_f', 'min_silence_f', \
-            'percentil75_silence_f', 'percentil90_silence_f', 'percentil95_silence_f', 'percentil99_silence_f', \
-            'DFLP_dispersion_f', 'EMA_trading_f', 'DMI_trading_f', 'aroonUp_trading_f', \
-            'mean_activity_fc', 'median_activity_fc', 'std_activity_fc', 'max_activity_fc', 'min_activity_fc', \
-            'percentil75_activity_fc', 'percentil90_activity_fc', 'percentil95_activity_fc', 'percentil99_activity_fc', \
-            'EMA_trading_fc', 'DMI_trading_fc', 'aroonUp_trading_fc',
-            'mean_activity_t', 'median_activity_t', 'std_activity_t', 'max_activity_t', 'min_activity_t', \
-            'percentil75_activity_t', 'percentil90_activity_t', 'percentil95_activity_t', 'percentil99_activity_t', \
-            'mean_silence_t', 'median_silence_t', 'std_silence_t', 'max_silence_t', 'min_silence_t', \
-            'percentil75_silence_t', 'percentil90_silence_t', 'percentil95_silence_t', 'percentil99_silence_t']
-
+def featuresToKeep(data, components):
 
     dataset = pd.DataFrame(data=data)
     dataset.columns = features + ['target']
@@ -96,16 +96,17 @@ def featuresToKeep(data):
 
         for index, tupl in enumerate(sort):
             classification_system[tupl[0]] += index
-    
-    classification_system = dict(sorted(classification_system.items(), key=lambda x: x[1]))
 
-    featuresKeeped = [ feature for index, feature in enumerate(classification_system.keys()) if index < 20]
+    classification_system = dict(sorted(classification_system.items(), key=lambda x: x[1]))    
+
+    featuresKeeped = [ feature for index, feature in enumerate(classification_system.keys()) if index < components]
     result = {}
 
     for index, feature in enumerate(features):
         if feature in featuresKeeped:
             result[index] = feature
     
+    print("Result:", result)
     return result
 
 '''
@@ -134,20 +135,24 @@ def readFileToMatrix(files) :
     
     matrix = []
     for f in files:
+
         fb = open(f, "rb")
+        filename = f.split('/')[-1].split("_")[0]
+
         try:
             while True:
                 # read each line of the file
-                record=fb.read(424)
+                record=fb.read(400)
                 
                 # break when the line was empty
-                if(len(record) < 424): break
+                if(len(record) < 400): break
                 
                 # unpack the record
-                line = list(struct.unpack('=53d',record))
-
-                # append the line to matrix
-                matrix.append(line)
+                line = list(struct.unpack('=50d',record))
+                
+                if ('anomaly' in filename and line[-1] == 1) or ('normal' in filename):    
+                    # append the line to matrix
+                    matrix.append(line)
     
         finally:
             fb.close()
@@ -319,7 +324,7 @@ def main():
     CV_test_normal = []
     CV_test_anomaly = []
     
-    kfold_splits = 6
+    kfold_splits = 5
     kf = KFold(n_splits=kfold_splits)
 
     # Prealloc dataFrame; it's much more faster when add a new row
@@ -344,7 +349,8 @@ def main():
 
     
     # Read files and keep only the features selected
-    features = featuresToKeep(readFileToMatrix(args.files))
+    # feat = featuresToKeep(readFileToMatrix(args.files), 5)
+    feat = {0: 'mean_activity_f', 29: 'percentil95_activity_fc', 43: 'max_silence_t', 45: 'percentil75_silence_t', 47: 'percentil95_silence_t'}
 
     
     # Divide filenames in normal or anomaly depending on the wildcard
@@ -389,9 +395,9 @@ def main():
         # Read file into a DataFrame
         train_data = pd.DataFrame(data=readFileToMatrix(cv_train))
         # Select the columns corresponding to the selected features
-        train_data = train_data.iloc[:,list(features.keys()) + [-1] ]
+        train_data = train_data.iloc[:,list(feat.keys()) + [-1] ]
         # To each column assign the feature name
-        train_data.columns = list(features.values()) + ['target']    
+        train_data.columns = list(feat.values()) + ['target']    
 
         # Split the data between data and labels
         Y = train_data['target']
@@ -405,7 +411,7 @@ def main():
         X = scaler.fit_transform(X)
         
         # Apply PCA to feature reduction        
-        pca = PCA(n_components=5)
+        pca = PCA(n_components=4)
         X = pca.fit_transform(X)
         
         score = []
@@ -418,10 +424,11 @@ def main():
             cl.fit(X)
 
             # Predict
-            regu_data = predict( cv_test_normal, scaler, cl, pca, features ).reshape(-1,1)
-            anom_data = predict( cv_test_anomaly, scaler, cl, pca, features ).reshape(-1,1)
+            regu_data = predict( cv_test_normal, scaler, cl, pca, feat ).reshape(-1,1)
+            anom_data = predict( cv_test_anomaly, scaler, cl, pca, feat ).reshape(-1,1)
 
             calc = calc_score(anom_data, regu_data)
+            print("SCORE:", calc)
 
             if not np.isnan(calc):
             

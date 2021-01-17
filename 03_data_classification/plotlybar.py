@@ -21,32 +21,33 @@ x = [str(a) for a in np.arange(1,53)]
 # 83.43, 82.44, 83.78, 82.39, 85.15, 83.20, 85.28, 83.06, 82.73, 83.17, 84.63, 83.99, 83.60, 83.54, 85.71, 84.31, 84.30, 83.98, 84.33, 84.84, 84.46, 85.53, 82.07, 82.15, 82.19, 82.14, 82.17, 82.19 ] + [0]*0
 
 # ETC
-# x = [1,5,10,15,20,25,30,35,40,45,50]
-# y = [68.46,73.49,75.32,80.12,87.02,80.37,85.33,84.59,84.63,86.07,84.76]
+# x = [1,5,10,15,20,25,30,35,40,45]
+# y = [73.51, 100, 100, 100, 100, 99, 100, 100, 100, 98]
 
 # ETC simplificado
-# x = [16,17,18,19,20]
-# y = [76.92,78.39,80.12,82.25,86.89]
+x = [1,2,3,4,5]
+y = [83.20,75.23,76.54,100,100]
 
 # PCA 
-# x = [1,5,10,15,20,25,30,35,40,45,50]
-# y = [62.61,68.54,75.14,74.60,79.28,80.09, 80.13, 84.30, 85.79, 84.00, 83.53]
+# xx = [1,5,10,15,20,25,30,35,40,45]
+# yy = [75.49, 100, 90.86, 93.93, 99.68, 100, 100, 100, 100, 100]
 
 # PCA simplificado
 # x = [36,37,38,39,40]
 # y = [83.90,0,0,0,0,0]
 
 # ETC with PCA
-x = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
-y = [71.22, 60.84, 85.84, 85.28, 88.92, 83.73, 83.77, 86.63, 86.03, 83.70, 83.88, 83.30, 83.18, 82.88, 83.93, 85.07, 80.16, 86.83,83.02,84.99]
+# x = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20]
+# y = [71.22, 60.84, 85.84, 85.28, 88.92, 83.73, 83.77, 86.63, 86.03, 83.70, 83.88, 83.30, 83.18, 82.88, 83.93, 85.07, 80.16, 86.83,83.02,84.99]
 
 data = {'NrFeatures': x, 'F1Score': y}
 df = pd.DataFrame(data=data)
 fig = make_subplots(rows=1, cols=1)
-fig.add_trace(go.Scatter(x = df['NrFeatures'], y = df['F1Score'], mode='lines+markers'), row=1, col=1)  
+fig.add_trace(go.Scatter(x = df['NrFeatures'], y = df['F1Score'], mode='lines+markers', name='PCA over ETC', marker_color='#10739E', marker_line_color='#10739E'), row=1, col=1)
+# fig.add_trace(go.Scatter(x = df['NrFeatures'], y = df['F1Score'], mode='lines+markers', name='ETC', marker_color='#10739E', marker_line_color='#10739E'), row=1, col=1)
+# fig.add_trace(go.Scatter(x = df['NrFeaturesPCA'], y = df['F1ScorePCA'], mode='lines+markers', name='PCA'), row=1, col=1)  
 
 # Customize aspect
-fig.update_traces(marker_color='#10739E', marker_line_color='#10739E')
 # fig.add_annotation(x=16, y=76.92,
 #             text="76.92%",
 #             showarrow=True,
@@ -76,11 +77,12 @@ fig.update_traces(marker_color='#10739E', marker_line_color='#10739E')
 #             showarrow=True,
 #             arrowhead=1)
 
-fig.add_annotation(x=5, y=88.92,
-            text="max = 88.92%",
-            showarrow=True,
-            arrowhead=1)
-fig.update_yaxes(range=[0,100])
+# fig.add_annotation(x=5, y=88.92,
+#             text="max = 88.92%",
+#             showarrow=True,
+#             arrowhead=1)
+fig.update_yaxes(range=[0,105])
+fig.update_xaxes(dtick=1, row=1, col=1)
 fig.update_layout(
     xaxis_title="Number of Features",
     yaxis_title="F1-Score",
@@ -93,7 +95,7 @@ fig.update_layout(
         'xanchor': 'center',
         'yanchor': 'top'},
     autosize = False,
-    width= 1400,
+    width= 800,
     height= 800
     )
 

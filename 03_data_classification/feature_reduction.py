@@ -11,6 +11,7 @@ import scipy.stats
 import numpy as np
 import pandas as pd
 from sklearn import svm
+from sklearn.ensemble import IsolationForest
 import dash
 import plotly.express as px
 import plotly.graph_objects as go
@@ -101,7 +102,7 @@ def featuresToKeep(data, components):
 
     classification_system = { feature: 0 for feature in features}
     
-    for i in range(1,200):
+    for i in range(1,50):
         
         # Building the model 
         extra_tree_forest = ExtraTreesClassifier(n_estimators = 5, criterion ='entropy', max_features = 2)
@@ -121,7 +122,8 @@ def featuresToKeep(data, components):
 
         for index, tupl in enumerate(sort):
             classification_system[tupl[0]] += index
-    
+
+    classification_system = dict(sorted(classification_system.items(), key=lambda x: x[1]))    
     '''
         At this moment we find the best features to model our problem, using the strategy of the points-based classification system.
         We repeat the process n times. The n=10 was sufficient to features keep in the same position of the classification system.
@@ -168,8 +170,6 @@ def featuresToKeep(data, components):
 
     # if __name__ == '__main__':
     #     app.run_server(debug=False, port=8055)
-
-    classification_system = dict(sorted(classification_system.items(), key=lambda x: x[1]))
 
     featuresKeeped = [ feature for index, feature in enumerate(classification_system.keys()) if index < components]
     result = {}
@@ -258,7 +258,7 @@ def print_results(anomaly_pred, regular_pred):
     print("Average success anomaly: {:.4f}%".format(hitRateAnomaly))
     print("Average success regular: {:.4f}%".format(hitRateClean))
 
-    # Calculate precision, recall and F1-Score    
+    # Calculate precision, recall and F1-Score  
     tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
     precision = tp/(tp+fp) * 100
     recall = tp/(tp+fn) * 100
@@ -267,7 +267,7 @@ def print_results(anomaly_pred, regular_pred):
     print("Precision:{:.2f}%".format(precision))
     print("Recall:{:.2f}%".format(recall))
     print("Confusion matrix:")
-    print(pd.DataFrame([[tp, fp], [fn, tn]], ["Pred Normal", "Pred Anomaly"], ["Actual Normal", "Actual Anomaly"]))
+    print(pd.DataFrame([[tp, fp], [fn, tn]], ["Actual Normal", "Actual Anomaly"], ["Predicted Normal", "Predicted Anomaly"]))
     print("----------------------------------------------------------")
 
     return f1_score, precision, nrAnomalies, nrClean, tp, fp, fn, tn
@@ -286,7 +286,6 @@ def remove_algorithms(score):
         if score[i] < median and (math.floor(score[i-1] - score[i]) >= 0.5*step or median - score[i] > 2*step):
             values.append(score[i])
 
-    print([x for i, x in enumerate(remv) if x not in values])
     return [i for i, x in enumerate(remv) if x in values]
 
 '''
@@ -307,24 +306,18 @@ def decide(pred, ignore=[]):
     Predict the values
 '''
 def predict(files, scaler, clf, pca, feat):
-    # print("Files 0:\n", *files, sep='\n')
     data = pd.DataFrame(data=readFileToMatrix(files))
-    # print("Data 0 :\n",data)
-    # print("Features :\n",feat)
-    data = data.iloc[:, list(feat.keys()) + [-1] ]
-    data.columns = list(feat.values()) + ['target']
-    # print("Data 1 :\n",data)
-    # data.columns = features + ['target']
+    # data = data.iloc[:, list(feat.keys()) + [-1] ]
+    # data.columns = list(feat.values()) + ['target']
+    data.columns = features + ['target']
 
     Y = data['target']
-    X = data.drop('target', axis=1)
-
     Y[Y == 1] = -1
     Y[Y == 0] = 1
-    Y = np.array(Y).reshape(-1,1)
+    X = data.drop('target', axis=1)
 
     data = scaler.transform(X)
-    # data = pca.transform(data)
+    data = pca.transform(data)
 
     return clf.predict(data)    
 
@@ -395,7 +388,7 @@ def main():
     CV_test_normal = []
     CV_test_anomaly = []
 
-    kfold_splits = 3
+    kfold_splits = 10
     kf = KFold(n_splits=kfold_splits)
 
     # Prealloc dataFrame; it's much more faster when add a new row
@@ -462,13 +455,15 @@ def main():
         # Read file into a DataFrame
         train_data = pd.DataFrame(data=readFileToMatrix(cv_train_normal))
         # Select the columns corresponding to the selected features
-        train_data = train_data.iloc[:,list(feat.keys()) + [-1] ]
+        # train_data = train_data.iloc[:,list(feat.keys()) + [-1] ]
         # To each column assign the feature name
-        train_data.columns = list(feat.values()) + ['target']    
-        # train_data.columns = features + ['target']
+        # train_data.columns = list(feat.values()) + ['target']    
+        train_data.columns = features + ['target']
         
         # Split the data between data and labels
         Y = train_data['target']
+        Y[Y == 1] = -1
+        Y[Y == 0] = 1
         X = train_data.drop('target', axis=1)
 
         # Standarize the values of the train data
@@ -479,7 +474,7 @@ def main():
         
         # Apply PCA to feature reduction        
         pca = PCA(n_components=comp)
-        # X = pca.fit_transform(X)
+        X = pca.fit_transform(X)
         
         score = []
         flag = True
@@ -496,11 +491,6 @@ def main():
 
             calc = calc_score(anom_data, regu_data)
             print("Calc:", calc)
-
-            # if cl not in classif:
-            #     classif[cl] = [calc]
-            # else:
-            #     classif[cl] += [calc]
 
             if not np.isnan(calc):
             
@@ -552,8 +542,8 @@ def main():
 
     print("\n",meanResultsWithIntervals)
 
-    print(color.BOLD+"\nConfusion matrix:"+color.END)
-    print(pd.DataFrame([[ int(float(meanResultsWithIntervals.loc['TP']['Mean'])), int(float(meanResultsWithIntervals.loc['FP']['Mean'])) ], [ int(float(meanResultsWithIntervals.loc['FN']['Mean'])) , int(float(meanResultsWithIntervals.loc['TN']['Mean'])) ]], ["Actual Normal", "Actual Anomaly"], ["Predicted Normal", "Predicted Anomaly"]))
+    # print(color.BOLD+"\nConfusion matrix:"+color.END)
+    # print(pd.DataFrame([[ int(float(meanResultsWithIntervals.loc['TP']['Mean'])), int(float(meanResultsWithIntervals.loc['FP']['Mean'])) ], [ int(float(meanResultsWithIntervals.loc['FN']['Mean'])) , int(float(meanResultsWithIntervals.loc['TN']['Mean'])) ]], ["Actual Normal", "Actual Anomaly"], ["Predicted Normal", "Predicted Anomaly"]))
   
 
     #print(*classif.items())

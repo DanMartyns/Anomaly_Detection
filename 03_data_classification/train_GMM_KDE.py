@@ -47,21 +47,20 @@ class color:
    UNDERLINE = '\033[4m'
    END = '\033[0m'
 
-def featuresToKeep(data):
-    
-    features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_activity_f', 'min_activity_f', \
-            'percentil75_activity_f', 'percentil90_activity_f', 'percentil95_activity_f', 'percentil99_activity_f', \
-            'mean_silence_f', 'median_silence_f', 'std_silence_f', 'max_silence_f', 'min_silence_f', \
-            'percentil75_silence_f', 'percentil90_silence_f', 'percentil95_silence_f', 'percentil99_silence_f', \
-            'DFLP_dispersion_f', 'EMA_trading_f', 'DMI_trading_f', 'aroonUp_trading_f', \
-            'mean_activity_fc', 'median_activity_fc', 'std_activity_fc', 'max_activity_fc', 'min_activity_fc', \
-            'percentil75_activity_fc', 'percentil90_activity_fc', 'percentil95_activity_fc', 'percentil99_activity_fc', \
-            'EMA_trading_fc', 'DMI_trading_fc', 'aroonUp_trading_fc',
-            'mean_activity_t', 'median_activity_t', 'std_activity_t', 'max_activity_t', 'min_activity_t', \
-            'percentil75_activity_t', 'percentil90_activity_t', 'percentil95_activity_t', 'percentil99_activity_t', \
-            'mean_silence_t', 'median_silence_t', 'std_silence_t', 'max_silence_t', 'min_silence_t', \
-            'percentil75_silence_t', 'percentil90_silence_t', 'percentil95_silence_t', 'percentil99_silence_t']
+# features name
+features = [ 'mean_activity_f', 'median_activity_f', 'std_activity_f', 'max_activity_f', 'min_activity_f', 
+'percentil75_activity_f', 'percentil90_activity_f', 'percentil95_activity_f', 'percentil99_activity_f',
+'mean_silence_f', 'median_silence_f', 'std_silence_f', 'max_silence_f', 'min_silence_f',
+'percentil75_silence_f', 'percentil90_silence_f', 'percentil95_silence_f', 'percentil99_silence_f',
+'DFLP_dispersion_f', 'EMA_trading_f', 'DMI_trading_f', 'aroonUp_trading_f',
+'mean_activity_fc', 'median_activity_fc', 'std_activity_fc', 'max_activity_fc', 'min_activity_fc',
+'percentil75_activity_fc', 'percentil90_activity_fc', 'percentil95_activity_fc', 'percentil99_activity_fc',
+'mean_activity_t', 'median_activity_t', 'std_activity_t', 'max_activity_t', 'min_activity_t',
+'percentil75_activity_t', 'percentil90_activity_t', 'percentil95_activity_t', 'percentil99_activity_t',
+'mean_silence_t', 'median_silence_t', 'std_silence_t', 'max_silence_t', 'min_silence_t',
+'percentil75_silence_t', 'percentil90_silence_t', 'percentil95_silence_t', 'percentil99_silence_t']
 
+def featuresToKeep(data, components):
 
     dataset = pd.DataFrame(data=data)
     dataset.columns = features + ['target']
@@ -92,18 +91,18 @@ def featuresToKeep(data):
 
         for index, tupl in enumerate(sort):
             classification_system[tupl[0]] += index
-    
-    classification_system = dict(sorted(classification_system.items(), key=lambda x: x[1]))
 
-    featuresKeeped = [ feature for index, feature in enumerate(classification_system.keys()) if index < 20]
+    classification_system = dict(sorted(classification_system.items(), key=lambda x: x[1]))    
+
+    featuresKeeped = [ feature for index, feature in enumerate(classification_system.keys()) if index < components]
     result = {}
 
     for index, feature in enumerate(features):
         if feature in featuresKeeped:
             result[index] = feature
     
+    print("Result:", result)
     return result
-
 def mean_confidence_interval(data, confidence=0.95):
     a = 1.0 * np.array(data)
     n = len(a)
@@ -117,20 +116,24 @@ def readFileToMatrix(files) :
     
     matrix = []
     for f in files:
+
         fb = open(f, "rb")
+        filename = f.split('/')[-1].split("_")[0]
+
         try:
             while True:
                 # read each line of the file
-                record=fb.read(424)
+                record=fb.read(400)
                 
                 # break when the line was empty
-                if(len(record) < 424): break
+                if(len(record) < 400): break
                 
                 # unpack the record
-                line = list(struct.unpack('=53d',record))
-
-                # append the line to matrix
-                matrix.append(line)
+                line = list(struct.unpack('=50d',record))
+                
+                if ('anomaly' in filename and line[-1] == 1) or ('normal' in filename):    
+                    # append the line to matrix
+                    matrix.append(line)
     
         finally:
             fb.close()
@@ -182,6 +185,27 @@ def print_results(anomaly_pred, regular_pred):
 
     return f1_score, tn, fp, fn, tp
 
+def choose_algorithm(argument): 
+    algorithms = { 
+
+        "GMM": [  
+            GaussianMixture(2, max_iter=1, covariance_type='full'),
+            GaussianMixture(3, max_iter=1, covariance_type='full'),
+            GaussianMixture(2, max_iter=50, covariance_type='full'),
+            GaussianMixture(3, max_iter=50, covariance_type='full')
+            ],
+        "KDE": [
+            KernelDensity(bandwidth=0.01),
+            KernelDensity(bandwidth=0.1)
+            ]
+    } 
+  
+    # get() method of dictionary data type returns  
+    # value of passed argument if it is present  
+    # in dictionary otherwise second argument will 
+    # be assigned as default value of passed argument 
+    return algorithms.get(argument, "SVM")
+
 def remove_algorithms(score):
     remv = copy.deepcopy(score)
     score.sort(reverse=True)
@@ -209,10 +233,10 @@ def decide(pred, ignore=[]):
     return np.array(l)
 
 
-def predict(files, scaler, clf, pca, features):
+def predict(files, scaler, clf, pca, feat):
     data = pd.DataFrame(data=readFileToMatrix(files))
-    data = data.iloc[:, list(features.keys()) + [-1]]
-    data.columns = list(features.values()) + ['target']
+    data = data.iloc[:, list(feat.keys()) + [-1]]
+    data.columns = list(feat.values()) + ['target']
     
     Y = data['target']
     X = data.drop('target', axis=1)
@@ -234,6 +258,8 @@ def main():
     parser.add_argument("-w", "--wildcard", required=True)
     # Type of anomaly
     parser.add_argument("-a", "--anomaly")
+    # Wants to export files
+    parser.add_argument("-alg","--algorithm", required=True)    
     # Wants to export files
     parser.add_argument("-e","--export",  action='store_true')
     # Print confusion matrix for each algorithm
@@ -257,14 +283,14 @@ def main():
     clean_files = []
     anomaly_files = []
 
-    features = featuresToKeep(readFileToMatrix(args.files))
+    # feat = featuresToKeep(readFileToMatrix(args.files), 5)
+    feat = {0: 'mean_activity_f', 29: 'percentil95_activity_fc', 43: 'max_silence_t', 45: 'percentil75_silence_t', 47: 'percentil95_silence_t'}
 
-    # divide filenames in normal or anomaly
+    # Divide filenames in normal or anomaly depending on the wildcard
     for f in args.files:
         if args.wildcard in f:
-            clean_files.append(f)
-        else:
-            #if args.anomaly in f.split('/')[-1]:
+            clean_files.append(f)  
+        elif args.anomaly in f:
             anomaly_files.append(f)
     
     clean_files = np.array(clean_files)
@@ -299,16 +325,18 @@ def main():
         cv_train = clean_files[train]
         cv_test_normal = clean_files[testN]
         cv_test_anomaly = anomaly_files[testA]
+        print("\nAnomaly Files:\n",*cv_test_anomaly, sep="\n")
+        print("\nClean Files:\n",*cv_test_normal, sep="\n")
 
         train_data = pd.DataFrame(data=readFileToMatrix(cv_train))
-        train_data = train_data.iloc[:,list(features.keys()) + [-1] ]
-        train_data.columns = list(features.values()) + ['target']
+        train_data = train_data.iloc[:,list(feat.keys()) + [-1] ]
+        train_data.columns = list(feat.values()) + ['target']
         size_train.append(train_data.shape[0])
         print("Train Data shappe:", train_data.shape)
 
         test_data = pd.DataFrame(data=readFileToMatrix(np.concatenate((cv_test_normal, cv_test_anomaly))))
-        test_data = test_data.iloc[:,list(features.keys()) + [-1] ]
-        test_data.columns = list(features.values()) + ['target']
+        test_data = test_data.iloc[:,list(feat.keys()) + [-1] ]
+        test_data.columns = list(feat.values()) + ['target']
         size_test.append(test_data.shape[0])
         print("Test Data shappe:", test_data.shape)
 
@@ -333,7 +361,7 @@ def main():
         ######################################################################    
 
         # Feature Dimensionality Reduction
-        pca = PCA(n_components=5)
+        pca = PCA(n_components=4)
         X = pca.fit_transform(X)
         X_test = pca.transform(X_test)
 
@@ -388,24 +416,15 @@ def main():
         true_normal = np.where(Y_test == 1)[0]
         true_outliers = np.where(Y_test == -1)[0] 
 
-        classifier = []
-
-        # classifier.append(KernelDensity(bandwidth=0.01))
-        # classifier.append(KernelDensity(bandwidth=0.1))
-
-        classifier.append(GaussianMixture(2, max_iter=1, covariance_type='full'))
-        classifier.append(GaussianMixture(3, max_iter=1, covariance_type='full'))
-        classifier.append(GaussianMixture(2, max_iter=50, covariance_type='full'))
-        classifier.append(GaussianMixture(3, max_iter=50, covariance_type='full'))
 
         start = time.time()
-        for cl in classifier:
+        for cl in choose_algorithm(args.algorithm):
             print("Classifier:", cl)
             
             clas = cl.fit(X)
             
             scores = clas.score_samples(X_test)
-            thresh = np.quantile(scores, .2)
+            thresh = np.quantile(scores, .4)
             do = np.where(scores < thresh)[0]
             values = X_test[do]
 
